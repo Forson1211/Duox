@@ -59,18 +59,20 @@ export function AuthPage({
   });
   const title =
     mode === "register"
-      ? "Your next rivalry starts here"
+      ? "Create Account"
       : mode === "login"
-        ? "Welcome back"
+        ? "Welcome Back"
         : mode === "forgot-password"
-          ? "Forgot your password?"
-          : "Choose a new password";
+          ? "Forgot Your Password?"
+          : "Choose a New Password";
   return (
     <main className="auth-page">
-      <Link className="brand" to="/" aria-label="DUO CLASH">
-        <Logo height={42} />
-      </Link>
       <section className="auth-card">
+        <div className="auth-card-logo">
+          <Link className="brand" to="/" aria-label="DUO CLASH">
+            <Logo height={44} />
+          </Link>
+        </div>
         <span className="section-kicker">
           A LITTLE COMPETITION. A LOT OF CONNECTION.
         </span>

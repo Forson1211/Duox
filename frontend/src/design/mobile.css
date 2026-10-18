@@ -328,7 +328,7 @@
     border-radius: 14px;
   }
   .search-field input {
-    font-size: 12px;
+    font-size: 16px;
   }
   .search-field > svg {
     width: 17px;
@@ -370,7 +370,7 @@
   .field-label input,
   .field-label select {
     padding: 13px 11px;
-    font-size: 13px;
+    font-size: 16px;
   }
   .setup-form > .field-label {
     margin-bottom: 21px;
@@ -688,9 +688,15 @@
   }
   .auth-card h1 {
     font-size: 27px;
+    text-align: center;
   }
   .auth-card > .section-kicker {
     font-size: 9px;
+    display: block;
+    text-align: center;
+  }
+  .auth-card > .muted {
+    text-align: center;
   }
   .auth-links {
     font-size: 10px;

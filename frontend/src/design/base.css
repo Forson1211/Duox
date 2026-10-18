@@ -398,7 +398,7 @@ html[data-theme="dark"] .logo-dark,
   border-radius: 13px;
   background: var(--bg);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   min-height: 48px;
 }
@@ -685,19 +685,32 @@ html[data-theme="dark"] .logo-dark,
   padding: 35px;
   box-shadow: 0 10px 35px #50327506;
 }
-.auth-card h1 {
-  font-size: 30px;
-  line-height: 1.2;
-  margin: 13px 0 15px;
+.auth-card-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.auth-card-logo .brand {
+  display: inline-flex;
 }
 .auth-card > .section-kicker {
+  display: block;
+  text-align: center;
   font-size: 10px;
   letter-spacing: 0.7px;
   line-height: 1.6;
   color: #aa95c0;
 }
+.auth-card h1 {
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 13px 0 15px;
+  text-align: center;
+}
 .auth-card > .muted {
   margin: 0 0 24px;
+  text-align: center;
 }
 .auth-links {
   display: flex;

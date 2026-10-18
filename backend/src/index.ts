@@ -25,14 +25,9 @@ async function ensureConnected() {
   if (isReady && mongoose.connection.readyState === 1) return;
   if (!initPromise) {
     initPromise = (async () => {
-      const uri = process.env.MONGODB_URI;
-      if (!uri && process.env.VERCEL) {
-        console.error(
-          "CRITICAL: MONGODB_URI is not set in Vercel project environment variables!",
-        );
-      }
       const mongoUri =
-        uri ?? "mongodb://127.0.0.1:27018/duo_clash?replicaSet=duo";
+        process.env.MONGODB_URI ||
+        "mongodb+srv://duox:370563forson@cluster0.wscgt4y.mongodb.net/duo_clash?retryWrites=true&w=majority";
 
       if (mongoose.connection.readyState !== 1) {
         await mongoose.connect(mongoUri, {
