@@ -4,7 +4,8 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "buildCommand": "npm --prefix ../shared run build && npm run build"
+      "buildCommand": "npm --prefix ../shared run build && npm run build",
+      "entrypoint": "index.js"
     },
     "frontend": {
       "root": "frontend",

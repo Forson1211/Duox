@@ -21,13 +21,16 @@ const scrypt = (password: string, salt: string): Promise<Buffer> =>
 export const production = process.env.NODE_ENV === "production";
 export const cookieName = "duo_session";
 export const allowedOrigins = (
-  process.env.FRONTEND_ORIGIN ?? "http://localhost:5173"
+  process.env.FRONTEND_ORIGIN ??
+  "https://duoxgame.vercel.app,http://localhost:5173"
 )
   .split(",")
   .map((o) => o.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-export const origin = allowedOrigins[0] ?? "http://localhost:5173";
+export const origin =
+  allowedOrigins[0] ?? "https://duoxgame.vercel.app";
+
 
 export function isAllowedOrigin(reqOrigin?: string): boolean {
   if (!reqOrigin) return true;
