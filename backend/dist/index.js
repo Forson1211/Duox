@@ -123633,7 +123633,7 @@ async function ensureConnected() {
   if (isReady && import_mongoose4.default.connection.readyState === 1) return;
   if (!initPromise) {
     initPromise = (async () => {
-      const mongoUri = process.env.MONGODB_URI || "mongodb+srv://duox:370563forson@cluster0.wscgt4y.mongodb.net/duo_clash?retryWrites=true&w=majority";
+      const mongoUri = process.env.MONGODB_URI || "mongodb://duox:370563forson@ac-pxpbn3e-shard-00-00.wscgt4y.mongodb.net:27017,ac-pxpbn3e-shard-00-01.wscgt4y.mongodb.net:27017,ac-pxpbn3e-shard-00-02.wscgt4y.mongodb.net:27017/duo_clash?ssl=true&authSource=admin&retryWrites=true&w=majority";
       if (import_mongoose4.default.connection.readyState !== 1) {
         await import_mongoose4.default.connect(mongoUri, {
           serverSelectionTimeoutMS: process.env.VERCEL ? 5e3 : 15e3
