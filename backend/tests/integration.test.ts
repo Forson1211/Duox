@@ -326,9 +326,12 @@ describe("real database, API, and socket integration", () => {
     expect(room(code).id).not.toBe(done.id);
     expect(room(code).results).toEqual([]);
     expect((await emit(sa, "room:join", { code })).ok).toBe(true);
-    expect(room(code).players.every((p) => p.score === 0 && !p.ready)).toBe(
-      true,
-    );
+    // The host is automatically ready in a new lobby; returning guests confirm.
+    expect(
+      room(code).players.every(
+        (p) => p.score === 0 && p.ready === (p.id === room(code).hostId),
+      ),
+    ).toBe(true);
     expect((await emit(sa, "answer:submit", payload)).ok).toBe(false);
     await emit(sb, "room:leave", {});
     expect(room(code).hostId).toBe(a.user.id);

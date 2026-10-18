@@ -75,6 +75,7 @@ export function createApplication(
   options: {
     timing?: { starting: number; results: number };
     staticDirectory?: string;
+    ensureDatabase?: () => Promise<void>;
   } = {},
 ) {
   const app = express();
@@ -144,6 +145,25 @@ export function createApplication(
   });
   const rooms = new RoomManager(io, options.timing);
   rooms.attach();
+  app.use("/api", async (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      await options.ensureDatabase?.();
+      next();
+    } catch (error) {
+      // Return JSON without exposing connection strings or platform HTML errors.
+      console.error(
+        "Database initialization failed:",
+        error instanceof Error ? error.name : "unknown error",
+      );
+      next(
+        new AppError(
+          "The game service is temporarily unavailable. Please try again shortly.",
+          503,
+        ),
+      );
+    }
+  });
   const api = express.Router();
   app.use("/api/v1", api);
   api.get("/health", (_req, res) =>
@@ -221,7 +241,7 @@ export function createApplication(
     requireUser,
     wrap(async (req, res) => {
       await Session.deleteOne({ _id: req.sessionId });
-      res.clearCookie(cookieName, getCookieOptions());
+      res.clearCookie(cookieName, { ...getCookieOptions(), maxAge: undefined });
       io.in(`user:${req.user!.id}`).disconnectSockets();
       res.json({ ok: true });
     }),
@@ -536,7 +556,7 @@ export function createApplication(
         await ChallengeCompletion.deleteMany({ userId: user.id }, { session });
         await MatchResult.deleteMany({ userId: user.id }, { session });
       });
-      res.clearCookie(cookieName, getCookieOptions());
+      res.clearCookie(cookieName, { ...getCookieOptions(), maxAge: undefined });
       res.json({ ok: true });
     }),
   );

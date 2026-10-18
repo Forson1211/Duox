@@ -1,11 +1,14 @@
 import esbuild from "esbuild";
+import fs from "node:fs";
 
 async function run() {
   try {
     await esbuild.build({
       entryPoints: ["src/index.ts"],
-      outfile: "dist/index.js",
+      outfile: "index.js",
       bundle: true,
+      // Keep runtime dependencies in their packages for reliable function tracing.
+      packages: "external",
       platform: "node",
       target: "node20",
       format: "esm",
@@ -19,7 +22,12 @@ const __dirname = __dirnameFunction(__filename);
 `,
       },
     });
-    console.log("Backend bundled successfully into dist/index.js!");
+
+    fs.mkdirSync("dist", { recursive: true });
+    fs.copyFileSync("index.js", "dist/index.js");
+    console.log(
+      "Backend bundled successfully into index.js and dist/index.js!",
+    );
   } catch (err) {
     console.error("Bundle failed:", err);
     process.exit(1);

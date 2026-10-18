@@ -57,9 +57,12 @@ npm.cmd run build
 npm.cmd audit
 npx.cmd playwright install chromium
 npm.cmd run test:browser
+npm.cmd run test:deployment
 ```
 
 `lint` checks strict TypeScript across workspaces. Tests use isolated MongoDB replica sets, not your Atlas database. Browser checks start their own app on port 5173, use independent Chromium contexts, exercise games/social/admin, check themes/mobile overflow/font loading, and save screenshots under `artifacts/`. Stop an existing frontend before running browser checks. First-run MongoDB/Chromium downloads require network access.
+
+`test:deployment` checks the compiled production account API and built frontend in Chromium, including cold-start registration, secure cookies, login, logout, and persistence after reload. Vercel setup is documented in [deployment](docs/deployment.md#vercel-account-creation-and-login).
 
 Executed check results are recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
@@ -89,4 +92,4 @@ See [architecture](docs/architecture.md), [API](docs/api.md), and [deployment](d
 
 ## Release boundaries
 
-One backend instance owns live rooms in memory. Restarting cancels unfinished rooms; accounts and completed results remain in MongoDB. Multiple instances need shared temporary state and a Socket.IO Redis adapter. Guest accounts, public matchmaking, tournaments, and unrestricted messaging are outside this first release. Reflex scores include network latency. Question/word banks are starter content. Atlas, SMTP, HTTPS hosting, backups, and production load testing need your own service configuration and are not verified by local tests.
+One backend instance owns live rooms in memory. Restarting ends active live rooms; accounts and completed results remain in MongoDB. Multiple instances need shared temporary state and a Socket.IO Redis adapter. Guest accounts, public matchmaking, tournaments, and unrestricted messaging are outside this first release. Reflex scores include network latency. Question/word banks are starter content. Atlas, SMTP, HTTPS hosting, backups, and production load testing need your own service configuration and are not verified by local tests.

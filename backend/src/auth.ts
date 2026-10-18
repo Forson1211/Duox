@@ -18,53 +18,38 @@ const scrypt = (password: string, salt: string): Promise<Buffer> =>
       (error, key) => (error ? reject(error) : resolve(key)),
     ),
   );
-export const production = process.env.NODE_ENV === "production";
+export const production =
+  process.env.NODE_ENV === "production" || !!process.env.VERCEL;
 export const cookieName = "duo_session";
 export const allowedOrigins = (
-  process.env.FRONTEND_ORIGIN ??
-  "https://duoxgame.vercel.app,http://localhost:5173"
+  process.env.FRONTEND_ORIGIN ?? "http://localhost:5173"
 )
   .split(",")
-  .map((o) => o.trim().replace(/\/$/, ""))
+  .map((value) => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-export const origin =
-  allowedOrigins[0] ?? "https://duoxgame.vercel.app";
-
+export const origin = allowedOrigins[0] ?? "http://localhost:5173";
 
 export function isAllowedOrigin(reqOrigin?: string): boolean {
   if (!reqOrigin) return true;
   const clean = reqOrigin.trim().replace(/\/$/, "");
   if (allowedOrigins.includes(clean)) return true;
+  if (production) return false;
   try {
     const parsed = new URL(clean);
-    if (parsed.hostname.endsWith(".vercel.app")) {
-      return true;
-    }
-    const isLoopback =
-      parsed.hostname === "localhost" ||
-      parsed.hostname === "127.0.0.1" ||
-      parsed.hostname === "[::1]";
-    if (
-      isLoopback &&
-      (parsed.protocol === "http:" || parsed.protocol === "https:")
-    ) {
-      return true;
-    }
-    const isPrivateIP =
-      /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(
-        parsed.hostname,
-      );
-    if (
-      isPrivateIP &&
-      (parsed.protocol === "http:" || parsed.protocol === "https:")
-    ) {
-      return true;
-    }
+    const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+      parsed.hostname,
+    );
+    const isPrivateIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(
+      parsed.hostname,
+    );
+    return (
+      (isLoopback || isPrivateIP) &&
+      ["http:", "https:"].includes(parsed.protocol)
+    );
   } catch {
     return false;
   }
-  return false;
 }
 export const hashToken = (s: string) =>
   createHash("sha256").update(s).digest("hex");
@@ -141,11 +126,10 @@ export async function createSession(userId: string, res: Response) {
   setSessionCookie(res, token);
 }
 export function getCookieOptions() {
-  const isHttps = production || origin.startsWith("https://");
   return {
     httpOnly: true,
-    secure: isHttps,
-    sameSite: (isHttps ? "none" : "lax") as "none" | "lax",
+    secure: production,
+    sameSite: "lax" as const,
     path: "/",
     maxAge: 7 * 86400000,
   };

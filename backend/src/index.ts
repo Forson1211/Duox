@@ -1,100 +1,46 @@
 import "dotenv/config";
-import dns from "node:dns";
 import mongoose from "mongoose";
 import { createApplication } from "./app.js";
+import { ensureConnected } from "./database.js";
 import { seedContent } from "./content.js";
-import { allModels, Match, Question } from "./models.js";
 
-// Only override DNS servers for local development where ISP SRV resolution might fail.
-// Do NOT override in Vercel/AWS Lambda as outbound UDP:53 to public IPs is blocked.
-if (!process.env.VERCEL && process.env.MONGODB_URI?.startsWith("mongodb+srv://")) {
-  try {
-    dns.setServers(["8.8.8.8", "1.1.1.1"]);
-  } catch {
-    // fallback to system default
-  }
-}
-
-const instance = createApplication();
+const instance = createApplication({ ensureDatabase: ensureConnected });
 const app = instance.app;
 
-let isReady = false;
-let initPromise: Promise<void> | null = null;
-
-async function ensureConnected() {
-  if (isReady && mongoose.connection.readyState === 1) return;
-  if (!initPromise) {
-    initPromise = (async () => {
-      const mongoUri =
-        process.env.MONGODB_URI ||
-        "mongodb://duox:370563forson@ac-pxpbn3e-shard-00-00.wscgt4y.mongodb.net:27017,ac-pxpbn3e-shard-00-01.wscgt4y.mongodb.net:27017,ac-pxpbn3e-shard-00-02.wscgt4y.mongodb.net:27017/duo_clash?ssl=true&authSource=admin&retryWrites=true&w=majority";
-
-      if (mongoose.connection.readyState !== 1) {
-        await mongoose.connect(mongoUri, {
-          serverSelectionTimeoutMS: process.env.VERCEL ? 5000 : 15000,
-        });
-        await Promise.all(
-          allModels.map((model) => model.init().catch(() => {})),
-        );
-
-        if (!process.env.VERCEL) {
-          await Match.updateMany(
-            { status: { $nin: ["completed", "cancelled"] } },
-            { status: "cancelled" },
-          );
-          await seedContent();
-        } else {
-          try {
-            const count = await Question.estimatedDocumentCount();
-            if (count === 0) {
-              await seedContent();
-            }
-          } catch {
-            // non-fatal in serverless cold start
-          }
-        }
-      }
-      isReady = true;
-    })().catch((err) => {
-      initPromise = null;
-      throw err;
-    });
-  }
-  await initPromise;
-}
-
-// Middleware to ensure DB is connected before processing data requests
-app.use(async (req, _res, next) => {
-  // Allow health endpoint to respond immediately with current DB status
-  if (req.path === "/health" || req.path === "/api/v1/health") {
-    void ensureConnected().catch(() => {});
-    return next();
-  }
-
-  try {
-    await ensureConnected();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-
-// When running standalone (e.g. locally or in a container):
+// Serverless hosts invoke the exported app; persistent hosts own Socket.IO too.
 if (!process.env.VERCEL) {
   const port = Number(process.env.PORT ?? 4000);
-  ensureConnected()
-    .then(() => {
-      instance.server.listen(port, () => {
-        console.log(`DUO CLASH is ready at http://localhost:${port}`);
-      });
-    })
-    .catch((e) => {
-      console.error(
-        `Startup error: ${e instanceof Error ? e.message : "unknown error"}`,
-      );
-    });
+  const start = async () => {
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+      throw new Error("PORT must be between 1 and 65535.");
+    if (
+      process.env.NODE_ENV === "production" &&
+      !process.env.FRONTEND_ORIGIN?.startsWith("https://")
+    )
+      throw new Error("Production requires an HTTPS FRONTEND_ORIGIN.");
+    await ensureConnected();
+    await seedContent();
+    instance.server.listen(port, () =>
+      console.log(`DUO CLASH is ready at http://localhost:${port}`),
+    );
+    const stop = async () => {
+      await instance.close();
+      await mongoose.disconnect();
+      process.exit(0);
+    };
+    process.once("SIGINT", () => void stop());
+    process.once("SIGTERM", () => void stop());
+  };
+  void start().catch(async (error: unknown) => {
+    console.error(
+      "Startup failed:",
+      error instanceof Error ? error.name : "unknown error",
+    );
+    await instance.close();
+    await mongoose.disconnect();
+    process.exitCode = 1;
+  });
 }
 
 export default app;
 export { instance, ensureConnected };
-
