@@ -1,0 +1,12 @@
+﻿@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+@import "./design/base.css";
+@import "./design/shell.css";
+@import "./design/home.css";
+@import "./design/leaderboard.css";
+@import "./design/room.css";
+@import "./design/welcome.css";
+@import "./design/dark.css";
+@import "./design/responsive.css";
+@import "./design/mobile.css";
+@import "./design/profile.css";

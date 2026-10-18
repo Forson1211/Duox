@@ -1,0 +1,39 @@
+{
+  "name": "@duo-clash/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "lint": "tsc -b --pretty",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@duo-clash/shared": "1.0.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@hookform/resolvers": "^3.10.0",
+    "@tanstack/react-query": "^5.90.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.62.0",
+    "react-router-dom": "^7.18.4",
+    "socket.io-client": "^4.8.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.5",
+    "vitest": "^5.0.5"
+  }
+}

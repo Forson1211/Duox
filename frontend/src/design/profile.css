@@ -1,0 +1,131 @@
+﻿.profile-card {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 45px 28px 29px;
+}
+.profile-card > .profile-avatar {
+  position: relative;
+  z-index: 2;
+  margin-top: 9px;
+  width: 99px;
+  height: 99px;
+  min-width: 99px;
+  border: 5px solid var(--surface);
+  box-shadow: 0 4px 12px #50386a10;
+}
+.profile-card > div:not(.profile-cover) {
+  position: relative;
+  z-index: 2;
+}
+.profile-card .row-actions {
+  justify-content: center;
+  padding-left: 0;
+}
+.profile-cover {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 108px;
+  overflow: hidden;
+  background: #e5d9fa;
+  pointer-events: none;
+}
+.profile-cover > .game-art {
+  position: absolute;
+  width: 126px;
+  height: 126px;
+  opacity: 0.7;
+  top: -16px;
+  left: 25px;
+  transform: rotate(-17deg);
+}
+.profile-cover > .game-art:last-child {
+  left: auto;
+  right: 26px;
+  top: -23px;
+  transform: rotate(13deg);
+}
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 11px;
+  margin: 22px 0 28px;
+  max-width: 570px;
+}
+.avatar-picker > button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 6px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 0;
+}
+.avatar-picker > button > .character-avatar {
+  width: 49px;
+  height: 49px;
+  min-width: 49px;
+}
+.avatar-picker > button.selected {
+  background: var(--lavender);
+  border-color: #b6a0e1;
+  color: var(--purple);
+}
+.avatar-picker > button > svg {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  color: var(--purple);
+}
+html[data-theme="dark"] .profile-cover {
+  background: #392a50;
+}
+@media (max-width: 600px) {
+  .profile-card {
+    padding: 34px 20px 26px;
+    gap: 16px;
+  }
+  .profile-card > .profile-avatar {
+    width: 90px;
+    height: 90px;
+    min-width: 90px;
+    margin-top: 16px;
+  }
+  .profile-card > div:nth-child(2) {
+    min-width: 0;
+  }
+  .profile-card .row-actions {
+    padding-left: 0;
+    justify-content: center;
+  }
+  .profile-cover {
+    height: 100px;
+  }
+  .profile-cover > .game-art {
+    width: 108px;
+    height: 108px;
+    left: 5px;
+  }
+  .profile-cover > .game-art:last-child {
+    right: 4px;
+  }
+  .avatar-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .avatar-picker > button {
+    padding: 14px 8px;
+    gap: 9px;
+    font-size: 11px;
+  }
+  .avatar-picker > button > .character-avatar {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "duo-clash",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "predev": "npm run build -w shared",
+    "dev": "concurrently -k -n web,api \"npm run dev -w frontend\" \"npm run dev -w backend\"",
+    "db": "npm run db -w backend",
+    "build": "npm run build -w shared && npm run build -w frontend && npm run build -w backend",
+    "lint": "npm run build -w shared && npm run lint --workspaces",
+    "test": "npm run build -w shared && npm run test -w backend && npm run test -w frontend",
+    "seed": "npm run seed -w backend",
+    "admin": "npm run admin -w backend",
+    "start": "npm run start -w backend",
+    "check": "npm run lint && npm test && npm run build",
+    "test:browser": "tsx scripts/browser-check.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.6.0"
+  },
+  "type": "module"
+}
