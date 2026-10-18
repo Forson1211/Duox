@@ -2,6 +2,7 @@
 
 ## Deployment authentication fix
 
+- Vercel schema correction: `includeFiles` uses one brace-expanded glob string. Both Vercel configuration files validate against the official schema from `https://openapi.vercel.sh/vercel.json`; the previous array reproduces the reported validation error. The glob was verified to include the backend bundle and shared JavaScript/type outputs.
 - Live diagnostic: `/api/v1/health` and `/api/v1/auth/me` returned HTTP 500 with Vercel's `FUNCTION_INVOCATION_FAILED`; `/login` returned HTTP 404 at the time of inspection.
 - Strict workspace TypeScript checks passed. A final backend type check also passed after the cookie cleanup change.
 - Backend tests: **28 passed**, including production cold-start initialization, retry after missing configuration, concurrent registration/health requests sharing a connection, secure sessions, login/logout, and origin restrictions. The existing rematch assertion was updated to reflect the established behavior that the host is automatically ready.
