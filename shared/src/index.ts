@@ -1,4 +1,5 @@
 import { z } from "zod";
+export const GAME_PROTOCOL_VERSION = 2;
 export const gameIds = [
   "quick-quiz",
   "memory-rush",
@@ -136,6 +137,7 @@ export type MatchStatus =
   | "waiting"
   | "starting"
   | "playing"
+  | "paused"
   | "round-results"
   | "completed"
   | "cancelled";
@@ -183,11 +185,21 @@ export interface RoomState {
   persisted: boolean;
   ratingChanges: Record<string, number>;
   chatMessages?: ChatMessage[];
+  pause?: {
+    byId: string;
+    at: number;
+    phase: "starting" | "playing" | "round-results";
+  };
+  restartRequestedBy?: string;
+  cancelReason?: string;
+  protocolVersion?: number;
+  revision?: number;
 }
 export type Reply<T = undefined> =
   { ok: true; data: T } | { ok: false; error: string };
 export type Ack<T = undefined> = (reply: Reply<T>) => void;
 export interface ChatMessage {
+  id?: string;
   userId: string;
   displayName: string;
   avatar: string;
@@ -200,10 +212,18 @@ export interface ClientEvents {
   "room:sync": (payload: { code?: string }, ack: Ack<RoomState | null>) => void;
   "room:leave": (payload: Record<string, never>, ack: Ack) => void;
   "room:ready": (payload: { ready: boolean }, ack: Ack) => void;
+  "room:pause": (payload: Record<string, never>, ack: Ack) => void;
+  "room:resume": (payload: Record<string, never>, ack: Ack) => void;
   "match:start": (payload: Record<string, never>, ack: Ack) => void;
   "match:rematch": (payload: Record<string, never>, ack: Ack) => void;
+  "match:restart": (payload: Record<string, never>, ack: Ack) => void;
+  "match:restart-request": (payload: Record<string, never>, ack: Ack) => void;
+  "match:cancel": (payload: Record<string, never>, ack: Ack) => void;
   "answer:submit": (payload: Answer, ack: Ack) => void;
-  "chat:send": (payload: { code: string; text: string }, ack: Ack) => void;
+  "chat:send": (
+    payload: { code: string; text: string; id?: string },
+    ack: Ack,
+  ) => void;
 }
 export interface ServerEvents {
   "room:state": (room: RoomState) => void;
@@ -258,3 +278,17 @@ export function weekStart(now = new Date()) {
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d;
 }
+
+export const chatSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^DUO-[A-Z2-9]{6}$/),
+  text: z.string().trim().min(1, "Enter a message.").max(500),
+  id: z.string().uuid().optional(),
+});
+export type PlayerIdentity = Pick<
+  Player,
+  "id" | "username" | "displayName" | "avatar" | "visibility"
+>;

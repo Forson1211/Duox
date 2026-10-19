@@ -1,5 +1,14 @@
 # Verification record
 
+## Multiplayer controls and chat - 2026-10-19
+
+- `npm.cmd run check` passed: strict workspace TypeScript checks, **55 backend tests**, **10 frontend tests**, and production builds. Both checked-in backend bundles are byte-identical.
+- New regressions cover pause/resume during countdown, memory viewing and reflex signals; fresh restart IDs and round-one resets; preserved completed results; guest restart requests; active-game quit/cancellation; and two-way, authenticated, idempotent chat restored across independent API instances.
+- Player discovery tests cover newly registered private identities, minimal public fields, 20-player pagination, block exclusions in both directions, pending requests, and literal search.
+- The compiled production browser suite passed with a desktop host and mobile guest across three independent API worker processes. It exercised discovery/friend acceptance, two-way chat and unread alerts, chat history after a paused refresh, shared resume, guest restart requests, fresh round one, all six games, persisted ranked results, cancellation, restart after cancellation, and active-game quit on both screens. Typing Space in chat did not submit a reflex answer. Code input remained enabled after the opponent answered.
+- Desktop and mobile screenshots were inspected. The game and public information pages passed 320 px overflow checks; no browser exceptions occurred.
+- Vercel configuration files validate against the official schema. Changed source and compiled bundles are checked for embedded database credentials; real environment files remain ignored.
+
 ## Six-game release - 2026-10-19
 
 - Strict workspace TypeScript checks and production frontend/backend builds passed. The two checked-in backend bundles are byte-identical.

@@ -36,7 +36,9 @@ The defaults work without `.env` files. Copy `backend/.env.example` to `backend/
 - Transactional, idempotent results; lifetime points; separate Elo ratings for ranked two-player matches.
 - Global, UTC weekly, quarterly seasonal, and friends leaderboards with pagination.
 - Profiles/privacy, history/recaps, achievements, automatic one-time daily rewards, settings, and device-synced light/dark themes.
-- Friend requests, acceptance/decline, presence, removal, reporting, blocking/unblocking.
+- Searchable, paginated discovery of registered players; friend requests, acceptance/decline, live presence, removal, reporting, blocking/unblocking. Private accounts share identity only in discovery.
+- In-room chat with unread previews and reconnect history on both HTTP and Socket.IO.
+- Shared pause/resume, host restart/cancel, guest restart requests, and quitting during play. Unfinished cancelled/restarted matches grant no points or rating changes; earlier completed results remain saved.
 - Server-protected admin statistics, question/category editing, activation, report review, suspension/restoration, and audit trail.
 - Responsive desktop/mobile navigation, accessible focus, reduced-motion support, and genuine loading/error/empty states.
 

@@ -16,6 +16,7 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import {
   registerSchema,
+  GAME_PROTOCOL_VERSION,
   loginSchema,
   games,
   achievements,
@@ -174,6 +175,7 @@ export function createApplication(
   app.use("/api/v1", api);
   api.get("/health", (_req, res) =>
     res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({
+      gameProtocol: GAME_PROTOCOL_VERSION,
       status: mongoose.connection.readyState === 1 ? "ok" : "unavailable",
       database:
         mongoose.connection.readyState === 1 ? "connected" : "disconnected",
@@ -548,6 +550,11 @@ export function createApplication(
             "match:rematch",
             "answer:submit",
             "chat:send",
+            "room:pause",
+            "room:resume",
+            "match:restart",
+            "match:restart-request",
+            "match:cancel",
           ]),
           payload: z.unknown(),
         })
@@ -688,7 +695,13 @@ export function createApplication(
     wrap(async (req, res) => {
       const id = req.user!.id;
       const search = z.string().max(40).default("").parse(req.query.q);
-      const page = z.coerce.number().int().min(1).max(1000).default(1).parse(req.query.page);
+      const page = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .default(1)
+        .parse(req.query.page);
       // Get existing friendship/block IDs to exclude
       const [friendships, blocks] = await Promise.all([
         Friendship.find({ $or: [{ requesterId: id }, { recipientId: id }] }),
@@ -699,16 +712,22 @@ export function createApplication(
         excludeIds.add(f.requesterId === id ? f.recipientId : f.requesterId);
       }
       for (const b of blocks) {
-        excludeIds.add(b.userId === id ? b.targetId : b.userId);
+        const blockedId = b.userId === id ? b.targetId : b.userId;
+        if (blockedId) excludeIds.add(blockedId);
       }
       const query: Record<string, unknown> = {
         status: "active",
-        visibility: "public",
-        _id: { $nin: [...excludeIds].map((eid) => new mongoose.Types.ObjectId(eid)) },
+        _id: {
+          $nin: [...excludeIds].map((eid) => new mongoose.Types.ObjectId(eid)),
+        },
       };
       if (search) {
         const escaped = [...search]
-          .map((c) => (".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92 ? "\\" + c : c))
+          .map((c) =>
+            ".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92
+              ? "\\" + c
+              : c,
+          )
           .join("");
         query.$or = [
           { displayName: new RegExp(escaped, "i") },
@@ -716,14 +735,30 @@ export function createApplication(
         ];
       }
       const [users, total] = await Promise.all([
-        User.find(query).sort({ points: -1 }).skip((page - 1) * 20).limit(20),
+        User.find(query)
+          .select("username displayName avatar visibility createdAt")
+          .sort({ createdAt: -1, _id: -1 })
+          .skip((page - 1) * 20)
+          .limit(20),
         User.countDocuments(query),
       ]);
       const onlineIds = new Set(
-        [...io.sockets.sockets.values()].map((s) => s.data.userId as string)
+        [...io.sockets.sockets.values()].map((s) => s.data.userId as string),
       );
+      const presence = await PlayerPresence.find({
+        _id: { $in: users.map((u) => u.id) },
+        expiresAt: { $gt: new Date() },
+      }).select("_id");
+      for (const row of presence) onlineIds.add(row.id);
       res.json({
-        users: users.map((u) => ({ ...publicPlayer(u), online: onlineIds.has(u.id) })),
+        users: users.map((u) => ({
+          id: u.id,
+          username: u.username,
+          displayName: u.displayName,
+          avatar: u.avatar,
+          visibility: u.visibility,
+          online: onlineIds.has(u.id),
+        })),
         total,
         page,
       });

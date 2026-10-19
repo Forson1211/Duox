@@ -26,7 +26,6 @@ import {
 import { dailyInfo } from "../src/rooms.js";
 let mongo: MongoMemoryReplSet;
 let app: ReturnType<typeof createApplication>;
-let url: string;
 const sockets: Socket<ServerEvents, ClientEvents>[] = [];
 const settings: RoomSettings = {
   name: "Integration clash",
@@ -65,6 +64,8 @@ async function register(n: string) {
   return { cookie, user: result.body.user };
 }
 async function connect(cookie: string) {
+  const address = app.server.address() as { port: number };
+  const url = `http://127.0.0.1:${address.port}`;
   const s: Socket<ServerEvents, ClientEvents> = io(url, {
     extraHeaders: { Cookie: cookie, Origin: "http://localhost:5173" },
     transports: ["websocket"],
@@ -106,7 +107,6 @@ beforeAll(async () => {
   await seedContent();
   app = createApplication({ timing: { starting: 50, results: 80 } });
   await new Promise<void>((r) => app.server.listen(0, "127.0.0.1", r));
-  url = `http://127.0.0.1:${(app.server.address() as { port: number }).port}`;
 }, 120000);
 afterAll(async () => {
   sockets.forEach((s) => s.disconnect());
@@ -789,5 +789,141 @@ describe("real database, API, and socket integration", () => {
         { $set: { prompt: original!.prompt, active: original!.active } },
       );
     }
+  });
+  it("discovers newly registered players including private identities without exposing account data", async () => {
+    const viewer = await register("directory_viewer"),
+      newcomer = await register("directory_newcomer");
+    await User.updateOne(
+      { _id: newcomer.user.id },
+      { $set: { visibility: "private" } },
+    );
+    const result = await request(app.app)
+      .get("/api/v1/users/discover/all")
+      .query({ q: "directory_newcomer" })
+      .set("Cookie", viewer.cookie);
+    expect(result.status).toBe(200);
+    expect(result.body.users).toHaveLength(1);
+    expect(result.body.users[0]).toMatchObject({
+      id: newcomer.user.id,
+      visibility: "private",
+      username: "directory_newcomer",
+    });
+    for (const key of [
+      "email",
+      "passwordHash",
+      "points",
+      "rating",
+      "achievements",
+    ])
+      expect(result.body.users[0]).not.toHaveProperty(key);
+    expect(
+      (
+        await request(app.app)
+          .get("/api/v1/users/discover/all")
+          .query({ q: "directory_viewer" })
+          .set("Cookie", viewer.cookie)
+      ).body.users,
+    ).toEqual([]);
+    await request(app.app)
+      .post("/api/v1/friends/requests")
+      .set("Cookie", viewer.cookie)
+      .send({ username: "directory_newcomer" });
+    expect(
+      (
+        await request(app.app)
+          .get("/api/v1/users/discover/all")
+          .query({ q: "directory_newcomer" })
+          .set("Cookie", viewer.cookie)
+      ).body.users,
+    ).toEqual([]);
+    expect(
+      (
+        await request(app.app)
+          .get("/api/v1/friends")
+          .set("Cookie", viewer.cookie)
+      ).body.friends.some((f: any) => f.user.id === newcomer.user.id),
+    ).toBe(true);
+  });
+  it("paginates the complete player directory and respects blocks in both directions", async () => {
+    const viewer = await register("directory_paging");
+    const fixture = await User.findById(viewer.user.id).select("+passwordHash");
+    const users = await User.insertMany(
+      Array.from({ length: 25 }, (_, i) => ({
+        username: "directory_fixture_" + i,
+        normalizedUsername: "directory_fixture_" + i,
+        email: "directory_fixture_" + i + "@example.test",
+        displayName: "Directory fixture " + i,
+        passwordHash: fixture!.passwordHash,
+        visibility: i === 0 ? "private" : "public",
+      })),
+    );
+    await request(app.app)
+      .post("/api/v1/blocks")
+      .set("Cookie", viewer.cookie)
+      .send({ userId: users[1].id });
+    const blockedPlayer = await register("directory_blocker");
+    await request(app.app)
+      .post("/api/v1/blocks")
+      .set("Cookie", blockedPlayer.cookie)
+      .send({ userId: viewer.user.id });
+    const get = (q: string, page = 1) =>
+      request(app.app)
+        .get("/api/v1/users/discover/all")
+        .query({ q, page })
+        .set("Cookie", viewer.cookie);
+    const one = await get("directory_fixture_"),
+      two = await get("directory_fixture_", 2);
+    expect(one.body.total).toBe(24);
+    expect(one.body.users).toHaveLength(20);
+    expect(two.body.users).toHaveLength(4);
+    expect(
+      new Set([...one.body.users, ...two.body.users].map((u: any) => u.id))
+        .size,
+    ).toBe(24);
+    expect((await get("directory_blocker")).body.users).toEqual([]);
+    expect((await get(".+")).body.users).toEqual([]);
+  });
+  it("synchronizes native socket chat, pause, resume, restart and cancellation", async () => {
+    const host = await register("native_controls"),
+      guest = await register("native_controls_guest");
+    const a = await connect(host.cookie),
+      b = await connect(guest.cookie);
+    const created = await emit<RoomState>(a, "room:create", {
+      ...settings,
+      gameIds: ["code-breaker"],
+      ranked: false,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) throw new Error(created.error);
+    const code = created.data.code;
+    await emit(b, "room:join", { code });
+    await emit(b, "room:ready", { ready: true });
+    expect(
+      (await emit(a, "chat:send", { code, text: "Native hello" })).ok,
+    ).toBe(true);
+    expect(room(code).chatMessages![0].text).toBe("Native hello");
+    await emit(a, "match:start", {});
+    await until(
+      () => room(code).status,
+      (status) => status === "playing",
+    );
+    expect((await emit(b, "room:pause", {})).ok).toBe(true);
+    expect(room(code).status).toBe("paused");
+    expect((await emit(a, "room:resume", {})).ok).toBe(true);
+    expect((await emit(b, "match:restart-request", {})).ok).toBe(true);
+    await until(
+      () => emit(a, "match:restart", {}),
+      (reply) => reply.ok,
+    );
+    expect(room(code).id).not.toBe(created.data.id);
+    await until(
+      () => room(code).status,
+      (status) => status === "playing",
+    );
+    expect(room(code).round).toBe(1);
+    expect((await emit(a, "match:cancel", {})).ok).toBe(true);
+    expect(room(code).status).toBe("cancelled");
+    await emit(b, "room:leave", {});
+    await emit(a, "room:leave", {});
   });
 });

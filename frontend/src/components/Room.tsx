@@ -1,3 +1,4 @@
+import { RoomControls } from "./RoomControls";
 import { PersonalBest } from "./Progress";
 import { GameArt } from "./GameArt";
 import { Avatar } from "./Avatar";
@@ -10,11 +11,8 @@ import {
   Crown,
   Delete,
   Home,
-  MessageCircle,
-  Pause,
   Plus,
   RotateCcw,
-  Send,
   Share2,
   Shuffle,
   Swords,
@@ -22,7 +20,6 @@ import {
   Users,
   Volume2,
   VolumeX,
-  X,
   Zap,
 } from "lucide-react";
 import {
@@ -42,7 +39,6 @@ import {
   type RoomState,
   type Challenge,
   type Answer,
-  type ChatMessage,
 } from "@duo-clash/shared";
 import { command, useApp } from "../lib/context";
 import { Heading } from "./Pages";
@@ -55,14 +51,6 @@ export function RoomPage() {
   const [now, setNow] = useState(Date.now());
   const offset = useRef(0);
   const leaving = useRef(false);
-  // Chat state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatText, setChatText] = useState("");
-  const [chatUnread, setChatUnread] = useState(0);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  // Pause/confirm quit state
-  const [confirmQuit, setConfirmQuit] = useState(false);
   useEffect(() => {
     if (room) offset.current = room.serverNow - Date.now();
   }, [room?.serverNow]);
@@ -70,35 +58,6 @@ export function RoomPage() {
     const t = setInterval(() => setNow(Date.now() + offset.current), 50);
     return () => clearInterval(t);
   }, []);
-  // Listen for incoming chat messages
-  useEffect(() => {
-    if (!socket) return;
-    const handler = (msg: ChatMessage) => {
-      setChatMessages((prev) => [...prev.slice(-99), msg]);
-      setChatUnread((n) => n + 1);
-    };
-    socket.on("chat:message" as any, handler);
-    return () => { socket.off("chat:message" as any, handler); };
-  }, [socket]);
-  // Sync room.chatMessages (essential for HTTP-polling / Vercel mode)
-  useEffect(() => {
-    if (room?.chatMessages && room.chatMessages.length > 0) {
-      setChatMessages((prev) => {
-        const seen = new Set(prev.map((m) => `${m.userId}:${m.at}:${m.text}`));
-        const fresh = room.chatMessages!.filter((m) => !seen.has(`${m.userId}:${m.at}:${m.text}`));
-        if (fresh.length === 0) return prev;
-        if (!chatOpen) setChatUnread((u) => u + fresh.length);
-        return [...prev, ...fresh].slice(-100);
-      });
-    }
-  }, [room?.chatMessages, chatOpen]);
-  // Scroll to bottom when chat opens or new message arrives
-  useEffect(() => {
-    if (chatOpen) {
-      setChatUnread(0);
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatOpen, chatMessages.length]);
   useEffect(() => {
     if (room?.status === "round-results") {
       const myScore = room.results
@@ -206,8 +165,8 @@ export function RoomPage() {
       </Heading>
       {!connected && (
         <p className="notice" role="status">
-          Connection lost. Reconnecting automatically. Answers are paused until
-          you reconnect.
+          Connection lost. Reconnecting automatically. The server clock
+          continues unless the match is paused.
         </p>
       )}
       {error && (
@@ -215,7 +174,7 @@ export function RoomPage() {
           {error}
         </p>
       )}
-      {room.status === "playing" && (
+      {(room.status === "playing" || room.status === "paused") && (
         <div className="live-score-strip" aria-label="Live scores">
           {[...room.players]
             .sort((a, b) => b.score - a.score)
@@ -226,48 +185,24 @@ export function RoomPage() {
                 <strong>{p.score}</strong>
               </div>
             ))}
-          {/* In-game controls */}
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            {host ? (
-              <button
-                className="btn btn-outline"
-                style={{ padding: "4px 10px", fontSize: "0.8rem" }}
-                onClick={() => setConfirmQuit(true)}
-                title="Pause / End game"
-              >
-                <Pause size={14} /> End
-              </button>
-            ) : (
-              <button
-                className="btn btn-outline"
-                style={{ padding: "4px 10px", fontSize: "0.8rem" }}
-                disabled={busy || !connected}
-                onClick={() => setConfirmQuit(true)}
-                title="Quit game"
-              >
-                <X size={14} /> Quit
-              </button>
-            )}
-          </div>
         </div>
       )}
+      <RoomControls room={room} onLeave={() => run("room:leave")} />
       <div
         className={`room-layout ${room.status === "playing" ? "round-in-progress" : ""}`}
       >
         <div className="room-main">
           {room.status === "cancelled" && (
             <section className="panel">
-              <h2>This room has expired.</h2>
+              <h2>This match has ended.</h2>
               <p className="muted">
-                Create a fresh challenge to play again. Completed results are
-                still in your history.
+                {room.cancelReason ?? "This room has expired."} Start a fresh
+                match or return home. Saved results stay in your history.
               </p>
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  setRoom(null);
-                  navigate("/app");
-                }}
+                disabled={busy || !connected}
+                onClick={() => void run("room:leave")}
               >
                 Return home
               </button>
@@ -366,14 +301,18 @@ export function RoomPage() {
               <p>Your first challenge is on its way.</p>
             </section>
           )}
-          {room.status === "playing" && room.challenge && (
-            <GameRound
-              key={room.challenge.id}
-              challenge={room.challenge}
-              now={now}
-              room={room}
-            />
-          )}
+          {(room.status === "playing" ||
+            (room.status === "paused" && room.pause?.phase === "playing")) &&
+            room.challenge && (
+              <div hidden={room.status === "paused"}>
+                <GameRound
+                  key={room.challenge.id}
+                  challenge={room.challenge}
+                  now={room.pause?.at ?? now}
+                  room={room}
+                />
+              </div>
+            )}
           {room.status === "round-results" && (
             <section className="panel round-summary">
               <span className="section-kicker">
@@ -515,7 +454,13 @@ export function RoomPage() {
                             : "Not ready"
                           : room.submitted.includes(p.id)
                             ? "Submitted"
-                            : "Playing"}
+                            : room.status === "paused"
+                              ? "Paused"
+                              : room.status === "completed"
+                                ? "Finished"
+                                : room.status === "cancelled"
+                                  ? "Match ended"
+                                  : "Answering"}
                     </small>
                   </div>
                   <span
@@ -566,214 +511,19 @@ export function RoomPage() {
           </p>
         </aside>
       </div>
-
-      {/* ── Confirm Quit / Cancel overlay ── */}
-      {confirmQuit && (
-        <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000, padding: "1rem",
-          }}
-        >
-          <div
-            className="panel"
-            style={{ maxWidth: 380, width: "100%", textAlign: "center", gap: "1rem" }}
-          >
-            <h2>{host ? "End or pause this match?" : "Leave this match?"}</h2>
-            <p className="muted">
-              {host
-                ? "Leaving as host will cancel the match for everyone. Are you sure?"
-                : "You will leave the room and lose your progress in this match."}
-            </p>
-            <div className="lobby-buttons" style={{ justifyContent: "center" }}>
-              <button
-                className="btn btn-outline"
-                style={{ minWidth: 100 }}
-                disabled={busy || !connected}
-                onClick={async () => {
-                  await run("room:leave");
-                  setConfirmQuit(false);
-                }}
-              >
-                {host ? "Cancel match" : "Leave room"}
-              </button>
-              <button
-                className="btn btn-primary"
-                style={{ minWidth: 100 }}
-                onClick={() => setConfirmQuit(false)}
-              >
-                Stay & play
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── In-game Chat Panel ── */}
-      {room.status !== "cancelled" && (
-        <>
-          {/* Floating chat button */}
-          <button
-            aria-label="Toggle chat"
-            onClick={() => setChatOpen((o) => !o)}
-            style={{
-              position: "fixed", bottom: "5.5rem", right: "1.25rem",
-              width: 52, height: 52, borderRadius: "50%",
-              background: "var(--accent, #7c3aed)",
-              color: "#fff", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-              zIndex: 900, fontSize: "0.75rem", gap: 4,
-            }}
-          >
-            <MessageCircle size={22} />
-            {!chatOpen && chatUnread > 0 && (
-              <span
-                style={{
-                  position: "absolute", top: 2, right: 2,
-                  background: "#ef4444", color: "#fff",
-                  borderRadius: "50%", width: 18, height: 18,
-                  fontSize: "0.65rem", display: "flex",
-                  alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, lineHeight: 1,
-                }}
-              >
-                {chatUnread > 9 ? "9+" : chatUnread}
-              </span>
-            )}
-          </button>
-
-          {/* Chat panel */}
-          {chatOpen && (
-            <div
-              style={{
-                position: "fixed", bottom: "5.5rem", right: "1.25rem",
-                width: "min(360px, calc(100vw - 2rem))",
-                height: "min(460px, 55vh)",
-                background: "var(--surface, #1a1a2e)",
-                border: "1px solid var(--border, rgba(255,255,255,0.1))",
-                borderRadius: 16, zIndex: 910, display: "flex",
-                flexDirection: "column", overflow: "hidden",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-              }}
-            >
-              {/* Chat header */}
-              <div
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderBottom: "1px solid var(--border, rgba(255,255,255,0.1))",
-                  display: "flex", justifyContent: "space-between",
-                  alignItems: "center", fontWeight: 600, fontSize: "0.95rem",
-                }}
-              >
-                <span>💬 In-Game Chat</span>
-                <button
-                  style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7 }}
-                  onClick={() => setChatOpen(false)}
-                  aria-label="Close chat"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Messages */}
-              <div
-                style={{
-                  flex: 1, overflowY: "auto", padding: "0.75rem",
-                  display: "flex", flexDirection: "column", gap: "0.5rem",
-                }}
-              >
-                {chatMessages.length === 0 && (
-                  <p style={{ color: "var(--muted, #888)", fontSize: "0.85rem", textAlign: "center", marginTop: "2rem" }}>
-                    No messages yet. Say hello! 👋
-                  </p>
-                )}
-                {chatMessages.map((msg, i) => {
-                  const isMe = msg.userId === user.id;
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        alignSelf: isMe ? "flex-end" : "flex-start",
-                        maxWidth: "80%",
-                      }}
-                    >
-                      {!isMe && (
-                        <span style={{ fontSize: "0.72rem", opacity: 0.6, marginBottom: 2, display: "block" }}>
-                          {msg.displayName}
-                        </span>
-                      )}
-                      <div
-                        style={{
-                          padding: "0.45rem 0.75rem",
-                          borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                          background: isMe ? "var(--accent, #7c3aed)" : "var(--border, rgba(255,255,255,0.1))",
-                          color: isMe ? "#fff" : "inherit",
-                          fontSize: "0.88rem",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {msg.text}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Input */}
-              <form
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderTop: "1px solid var(--border, rgba(255,255,255,0.1))",
-                  display: "flex", gap: 8,
-                }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const text = chatText.trim();
-                  if (!text || !room) return;
-                  setChatText("");
-                  void command(socket, "chat:send", { code: room.code, text });
-                }}
-              >
-                <input
-                  style={{
-                    flex: 1, background: "var(--border, rgba(255,255,255,0.08))",
-                    border: "1px solid var(--border, rgba(255,255,255,0.15))",
-                    borderRadius: 8, padding: "0.4rem 0.6rem",
-                    color: "inherit", fontSize: "0.88rem",
-                    outline: "none",
-                  }}
-                  placeholder="Type a message…"
-                  maxLength={200}
-                  value={chatText}
-                  onChange={(e) => setChatText(e.target.value)}
-                  autoComplete="off"
-                />
-                <button
-                  type="submit"
-                  disabled={!chatText.trim() || !connected}
-                  style={{
-                    background: "var(--accent, #7c3aed)", border: "none",
-                    borderRadius: 8, padding: "0.4rem 0.6rem",
-                    color: "#fff", cursor: "pointer", display: "flex",
-                    alignItems: "center",
-                  }}
-                  aria-label="Send message"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
-            </div>
-          )}
-        </>
-      )}
     </>
   );
 }
 function ShieldIcon() {
   return <Check size={16} />;
+}
+function ignoreGameKey(event: KeyboardEvent) {
+  return (
+    event.target instanceof HTMLElement &&
+    !!event.target.closest(
+      "input, textarea, select, button, [role=dialog], [contenteditable=true]",
+    )
+  );
 }
 export function GameRound({
   challenge: c,
@@ -814,7 +564,10 @@ export function GameRound({
   const remaining = Math.max(0, Math.ceil((c.deadline - now) / 1000));
 
   // Memory rush timing: blink off for last 200ms of every 650ms step to clearly show repeated tiles
-  const viewing = c.gameId === "memory-rush" && now < (c.showUntil ?? 0);
+  const viewing =
+    room.status === "playing" &&
+    c.gameId === "memory-rush" &&
+    now < (c.showUntil ?? 0);
   const stepDuration = 650;
   const elapsedSinceStart = Math.max(0, now - c.startedAt);
   const activeStep = viewing
@@ -848,10 +601,17 @@ export function GameRound({
     }
   }, [c.gameId, go, submitted]);
 
-  const disabled = submitted || busy || !connected || now >= c.deadline;
+  const disabled =
+    submitted ||
+    busy ||
+    !connected ||
+    room.status !== "playing" ||
+    now >= c.deadline;
+  const submitting = useRef(false);
 
   const send = async (value: Answer["value"]) => {
-    if (disabled) return;
+    if (disabled || submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
     try {
@@ -864,6 +624,7 @@ export function GameRound({
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   };
@@ -886,6 +647,7 @@ export function GameRound({
   useEffect(() => {
     if (c.gameId !== "reflex-race" || disabled) return;
     const key = (e: KeyboardEvent) => {
+      if (ignoreGameKey(e)) return;
       if (e.code === "Space" && !e.repeat) {
         e.preventDefault();
         handleReflexTap();
@@ -904,11 +666,7 @@ export function GameRound({
     )
       return;
     const key = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
+      if (ignoreGameKey(e)) return;
       const k = e.key.toUpperCase();
       let index = -1;
       if (k === "A" || k === "1") index = 0;
@@ -943,11 +701,7 @@ export function GameRound({
   useEffect(() => {
     if (c.gameId !== "memory-rush" || disabled || viewing) return;
     const key = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
+      if (ignoreGameKey(e)) return;
       if (["1", "2", "3", "4"].includes(e.key)) {
         e.preventDefault();
         handleTileClick(parseInt(e.key, 10) - 1);
@@ -1042,7 +796,11 @@ export function GameRound({
     c.sequenceLength ?? c.sequence?.length ?? Math.max(sequence.length, 3);
 
   return (
-    <section className="panel game-arena" data-game={c.gameId}>
+    <section
+      className="panel game-arena"
+      data-game={c.gameId}
+      data-round-id={c.id}
+    >
       <div className="arena-top">
         <span className="section-kicker">
           ROUND {room.round} / {room.settings.rounds} ·{" "}
@@ -1081,6 +839,38 @@ export function GameRound({
         />
       </div>
       <h2>{c.prompt}</h2>
+      <p className="answer-status" role="status">
+        {submitted
+          ? "Answer submitted. Waiting for the other players or the clock."
+          : "Your answer is open. Everyone answers this round."}
+      </p>
+      {!games.some((game) => game.id === c.gameId) && (
+        <div className="error-box" role="alert">
+          This game needs the latest screen.{" "}
+          <button
+            className="btn btn-outline"
+            onClick={() => window.location.reload()}
+          >
+            Reload game
+          </button>
+        </div>
+      )}
+      {c.gameId === "code-breaker" && !c.clues?.length && (
+        <p className="notice">
+          The puzzle is loading.{" "}
+          <button
+            type="button"
+            className="text-link"
+            onClick={() =>
+              void command(socket, "room:sync", { code: room.code }).catch(
+                (e) => setError(e.message),
+              )
+            }
+          >
+            Reload puzzle
+          </button>
+        </p>
+      )}
       {c.gameId === "number-circuit" && (
         <div className="number-circuit" aria-label="Math challenge">
           <span className="circuit-eyebrow">QUICK THINKING. CLEAR MIND.</span>

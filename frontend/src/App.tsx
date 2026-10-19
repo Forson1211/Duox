@@ -91,6 +91,7 @@ export default function App() {
     media.addEventListener("change", syncTheme);
     return () => media.removeEventListener("change", syncTheme);
   }, []);
+  const [updateRequired, setUpdateRequired] = useState(false);
   const [socket, setSocket] = useState<GameSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -238,6 +239,7 @@ export default function App() {
         void query.invalidateQueries({ queryKey: ["me"] });
     });
     s.on("connect_error", () => setConnected(false));
+    s.on("update:required", () => setUpdateRequired(true));
     s.on("room:state", (r) => {
       setRoom(r);
       if (r?.status === "completed" && completedId !== r.id) {
@@ -285,7 +287,7 @@ export default function App() {
   };
   const matchFocus =
     !!room &&
-    ["starting", "playing", "round-results"].includes(room.status) &&
+    ["starting", "playing", "paused", "round-results"].includes(room.status) &&
     location.pathname === "/app/rooms/" + room.code;
   const logout = async () => {
     try {
@@ -385,6 +387,17 @@ export default function App() {
       <div
         className={`app game-app ${dark ? "theme-dark" : ""} ${matchFocus ? "match-focus" : ""}`}
       >
+        {updateRequired && (
+          <div className="game-update-banner" role="status">
+            A game update is available.{" "}
+            <button
+              className="btn btn-outline"
+              onClick={() => window.location.reload()}
+            >
+              Reload game
+            </button>
+          </div>
+        )}
         <aside className={`sidebar ${menu ? "sidebar-open" : ""}`}>
           <Link to="/app" className="brand" aria-label="DUO CLASH">
             <Logo height={34} />

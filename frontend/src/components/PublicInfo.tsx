@@ -14,6 +14,10 @@ const sections = {
         "Your display name, username, avatar, points, rating, and achievements appear on your public profile. Set your profile to private in Settings to hide it from public profiles and rankings.",
       ],
       [
+        "Room chat",
+        "Messages are shared with people in your room and restored when you reconnect. The room keeps its recent conversation until it expires. Your name and avatar can be found in Friends so people can send you requests; private profile statistics stay hidden.",
+      ],
+      [
         "Your game history",
         "Completed matches and rewards are saved so your progress survives signing out. Temporary room state expires. Session cookies keep you signed in.",
       ],

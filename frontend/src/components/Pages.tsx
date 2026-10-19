@@ -42,6 +42,7 @@ import {
   gameIds,
   type Account,
   type Player,
+  type PlayerIdentity,
   type RoomState,
   type RoomSettings,
   type GameId,
@@ -740,6 +741,15 @@ export function Friends() {
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [discoverSearch, setDiscoverSearch] = useState("");
+  const [discoverPage, setDiscoverPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(discoverSearch);
+      setDiscoverPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [discoverSearch]);
   const [sendingTo, setSendingTo] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["friends"],
@@ -754,16 +764,22 @@ export function Friends() {
         }[];
         blocked: Player[];
       }>("/friends"),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
   const discover = useQuery({
-    queryKey: ["discover", discoverSearch],
+    queryKey: ["discover", searchTerm, discoverPage],
     queryFn: () =>
-      api<{ users: (Player & { online: boolean })[]; total: number }>(
-        `/users/discover/all?q=${encodeURIComponent(discoverSearch)}`,
+      api<{ users: (PlayerIdentity & { online: boolean })[]; total: number }>(
+        `/users/discover/all?q=${encodeURIComponent(searchTerm.trim())}&page=${discoverPage}`,
       ),
-    refetchInterval: 60000,
+    refetchInterval: 10000,
   });
+  useEffect(() => {
+    if (discover.data) {
+      const lastPage = Math.max(1, Math.ceil(discover.data.total / 20));
+      if (discoverPage > lastPage) setDiscoverPage(lastPage);
+    }
+  }, [discover.data?.total, discoverPage]);
   const run = async (path: string, body: unknown = {}, method = "POST") => {
     setBusy(true);
     try {
@@ -771,7 +787,10 @@ export function Friends() {
         method,
         body: method === "DELETE" ? undefined : JSON.stringify(body),
       });
-      await query.invalidateQueries({ queryKey: ["friends"] });
+      await Promise.all([
+        query.invalidateQueries({ queryKey: ["friends"] }),
+        query.invalidateQueries({ queryKey: ["discover"] }),
+      ]);
       setUsername("");
       notify("Updated.");
     } catch (e) {
@@ -906,6 +925,8 @@ export function Friends() {
         <label className="search-field" style={{ marginBottom: "1rem" }}>
           <Search size={17} />
           <input
+            aria-label="Search players"
+            maxLength={40}
             type="search"
             placeholder="Search players…"
             value={discoverSearch}
@@ -927,13 +948,18 @@ export function Friends() {
         {discover.data?.users.map((p) => (
           <div className="friend-row" key={p.id}>
             <Avatar player={p} />
-            <Link to={"/app/players/" + p.username}>
-              <strong>{p.displayName}</strong>
+            <div className="discovered-player-name">
+              {p.visibility === "public" ? (
+                <Link to={"/app/players/" + p.username}>
+                  <strong>{p.displayName}</strong>
+                </Link>
+              ) : (
+                <strong>{p.displayName}</strong>
+              )}
               <small>
-                @{p.username} · {p.online ? "🟢 Online" : "Offline"} ·{" "}
-                {p.points.toLocaleString()} pts
+                @{p.username} - {p.online ? "Online" : "Offline"}
               </small>
-            </Link>
+            </div>
             <div className="row-actions">
               <button
                 className="btn btn-primary"
@@ -947,9 +973,31 @@ export function Friends() {
           </div>
         ))}
         {(discover.data?.total ?? 0) > 20 && (
-          <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
-            Showing top 20 results. Use search to find specific players.
-          </p>
+          <div className="discovery-pagination">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={discoverPage === 1 || discover.isFetching}
+              onClick={() => setDiscoverPage((p) => p - 1)}
+            >
+              Previous players
+            </button>
+            <span>
+              Page {discoverPage} of{" "}
+              {Math.ceil((discover.data?.total ?? 0) / 20)}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={
+                discoverPage >= Math.ceil((discover.data?.total ?? 0) / 20) ||
+                discover.isFetching
+              }
+              onClick={() => setDiscoverPage((p) => p + 1)}
+            >
+              Next players
+            </button>
+          </div>
         )}
       </section>
     </>

@@ -1,4 +1,4 @@
-﻿@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/theme" layer(theme);
 @import "tailwindcss/utilities" layer(utilities);
 @import "./design/base.css";
 @import "./design/shell.css";
@@ -12,3 +12,5 @@
 @import "./design/profile.css";
 @import "./design/mind-games.css";
 @import "./design/progress.css";
+
+@import "./design/social-game.css";

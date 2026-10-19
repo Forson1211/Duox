@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Server, Socket } from "socket.io";
 import {
   answerSchema,
+  chatSchema,
+  GAME_PROTOCOL_VERSION,
   roomSchema,
   eloDelta,
   gameIds,
@@ -14,6 +16,7 @@ import {
   type RoomSettings,
   type RoundResult,
   type Answer,
+  type ChatMessage,
 } from "@duo-clash/shared";
 import { AppError, authenticate, publicPlayer } from "./auth.js";
 import {
@@ -40,6 +43,7 @@ export interface Member {
   score: number;
   disconnectedAt?: number;
   lastSeenAt?: number;
+  lastChatAt?: number;
 }
 export interface LiveRoom {
   id: string;
@@ -62,6 +66,10 @@ export interface LiveRoom {
   completedPlayers?: RoomState["players"];
   usedQuizPrompts?: string[];
   chatMessages?: ChatMessage[];
+  pausedRemaining?: number;
+  pause?: RoomState["pause"];
+  restartRequestedBy?: string;
+  cancelReason?: string;
 }
 export function dailyInfo(now = new Date()) {
   const day = now.toISOString().slice(0, 10);
@@ -122,6 +130,18 @@ export class RoomManager {
           }))
         : activePlayers;
     const top = Math.max(...players.map((p) => p.score));
+    const pause =
+      room.pause ??
+      (room.status === "paused"
+        ? {
+            byId: room.hostId,
+            phase:
+              room.round === 0 ? ("starting" as const) : ("playing" as const),
+            at: room.secret
+              ? room.secret.challenge.deadline - (room.pausedRemaining ?? 0)
+              : Date.now(),
+          }
+        : undefined);
     return {
       id: room.id,
       code: room.code,
@@ -131,8 +151,10 @@ export class RoomManager {
       players,
       round: room.round,
       challenge:
-        room.secret && room.status === "playing"
-          ? safeChallenge(room.secret)
+        room.secret &&
+        (room.status === "playing" ||
+          (room.status === "paused" && pause?.phase === "playing"))
+          ? safeChallenge(room.secret, pause?.at ?? Date.now())
           : null,
       submitted: [...room.answers.keys()],
       results: room.results,
@@ -145,6 +167,10 @@ export class RoomManager {
       persisted: room.persisted,
       ratingChanges: room.ratingChanges,
       chatMessages: room.chatMessages ?? [],
+      pause,
+      restartRequestedBy: room.restartRequestedBy,
+      cancelReason: room.cancelReason,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     };
   }
   broadcast(room: LiveRoom) {
@@ -312,10 +338,12 @@ export class RoomManager {
   async leave(userId: string) {
     const room = this.get(userId);
     const active = !["waiting", "completed", "cancelled"].includes(room.status);
-    if (active)
-      throw new AppError(
-        "A match is in progress. You can reconnect until it finishes.",
+    if (active && !room.persisted) {
+      await this.cancelRoom(
+        room,
+        room.members.get(userId)!.player.displayName + " left the match.",
       );
+    } else if (room.persisted) room.status = "completed";
     const m = room.members.get(userId)!;
     for (const id of m.sockets)
       await this.io.sockets.sockets.get(id)?.leave(room.code);
@@ -328,10 +356,110 @@ export class RoomManager {
         { status: "cancelled" },
       );
     } else {
-      if (room.hostId === userId)
+      if (room.hostId === userId) {
         room.hostId = room.members.keys().next().value!;
+        room.members.get(room.hostId)!.ready = true;
+      }
       this.broadcast(room);
     }
+  }
+  pause(userId: string) {
+    const r = this.get(userId);
+    if (r.status === "paused") return;
+    if (
+      !["playing", "starting", "round-results"].includes(r.status) ||
+      r.persisted ||
+      r.saving
+    )
+      throw new AppError("This match cannot be paused now.");
+    if (
+      r.status === "playing" &&
+      r.secret &&
+      Date.now() >= r.secret.challenge.deadline
+    )
+      throw new AppError(
+        "This round has just ended. Try again in the next round.",
+      );
+    r.pause = {
+      byId: userId,
+      at: Date.now(),
+      phase: r.status as "playing" | "starting" | "round-results",
+    };
+    r.status = "paused";
+    this.broadcast(r);
+  }
+  resume(userId: string) {
+    const r = this.get(userId);
+    if (r.status !== "paused") throw new AppError("Match is not paused.");
+    const paused = this.state(r).pause!;
+    const elapsed = Math.max(0, Date.now() - paused.at);
+    if (r.secret) {
+      const c = r.secret.challenge;
+      c.startedAt += elapsed;
+      c.deadline += elapsed;
+      if (c.showUntil !== undefined) c.showUntil += elapsed;
+      if (c.signalAt !== undefined) c.signalAt += elapsed;
+      if (r.secret.signalAt !== undefined) r.secret.signalAt += elapsed;
+    }
+    if (r.nextAt !== undefined) r.nextAt += elapsed;
+    r.status = paused.phase;
+    r.pause = undefined;
+    r.pausedRemaining = undefined;
+    this.broadcast(r);
+  }
+  private async cancelRoom(r: LiveRoom, reason: string) {
+    if (r.persisted || r.saving)
+      throw new AppError("This match has finished. Its saved scores are kept.");
+    const previous = r.status;
+    r.status = "cancelled";
+    try {
+      await Match.updateOne(
+        { _id: r.id, status: { $ne: "completed" } },
+        { $set: { status: "cancelled" } },
+      );
+    } catch (error) {
+      r.status = previous;
+      throw error;
+    }
+    r.pause = undefined;
+    r.nextAt = undefined;
+    r.restartRequestedBy = undefined;
+    r.cancelReason = reason;
+    this.broadcast(r);
+  }
+  async cancel(userId: string) {
+    const r = this.get(userId);
+    if (r.hostId !== userId)
+      throw new AppError("Only the host can cancel the match.", 403);
+    if (r.status === "cancelled") return;
+    await this.cancelRoom(r, "The host cancelled this match.");
+  }
+  requestRestart(userId: string) {
+    const r = this.get(userId);
+    if (!["starting", "playing", "paused", "round-results"].includes(r.status))
+      throw new AppError("There is no active match to restart.");
+    r.restartRequestedBy = userId;
+    this.broadcast(r);
+  }
+  async restart(userId: string) {
+    return this.exclusive(userId, async () => {
+      const r = this.get(userId);
+      if (r.hostId !== userId)
+        throw new AppError(
+          "Only the host can restart the match. Send a restart request instead.",
+          403,
+        );
+      if (r.saving || this.busy.has(r.code))
+        throw new AppError("The round is changing. Please try again.", 409);
+      await this.rematchRoom(userId, true);
+      if (
+        [...r.members.values()].every((m) => m.sockets.size > 0) &&
+        (!r.settings.ranked || r.members.size === 2)
+      ) {
+        for (const m of r.members.values()) m.ready = true;
+        await this.startMatch(userId);
+      }
+    });
   }
   ready(userId: string, ready: boolean) {
     const r = this.get(userId);
@@ -394,6 +522,7 @@ export class RoomManager {
     if (r.answers.size === r.members.size) await this.endRound(r);
   }
   private async beginRound(r: LiveRoom, startedAt = Date.now()) {
+    const expected = { id: r.id, status: r.status, round: r.round };
     const nextRound = r.round + 1;
     const game =
       r.settings.gameIds[(nextRound - 1) % r.settings.gameIds.length];
@@ -405,6 +534,12 @@ export class RoomManager {
       startedAt,
       r.usedQuizPrompts ?? [],
     );
+    if (
+      r.id !== expected.id ||
+      r.status !== expected.status ||
+      r.round !== expected.round
+    )
+      return;
     r.round = nextRound;
     r.secret = secret;
     if (game === "quick-quiz") {
@@ -559,17 +694,21 @@ export class RoomManager {
   async rematch(userId: string) {
     return this.exclusive(userId, () => this.rematchRoom(userId));
   }
-  private async rematchRoom(userId: string) {
+  private async rematchRoom(userId: string, restart = false) {
     const r = this.get(userId);
     if (r.hostId !== userId)
       throw new AppError("Only the host can set up a rematch.", 403);
-    if (r.status !== "completed" || !r.persisted)
+    if (!restart && (r.status !== "completed" || !r.persisted))
       throw new AppError("Wait for the results to save.");
+    if (r.saving) throw new AppError("Wait for the results to save.");
     const nextId = randomUUID();
     await mongoose.connection.transaction(async (session) => {
       await Match.updateOne(
         { _id: r.id },
-        { $unset: { roomCode: 1 } },
+        {
+          $unset: { roomCode: 1 },
+          ...(!r.persisted ? { $set: { status: "cancelled" } } : {}),
+        },
         { session },
       );
       await Match.create(
@@ -587,6 +726,10 @@ export class RoomManager {
     });
     r.id = nextId;
     r.completedPlayers = undefined;
+    r.pause = undefined;
+    r.pausedRemaining = undefined;
+    r.restartRequestedBy = undefined;
+    r.cancelReason = undefined;
     r.usedQuizPrompts = [];
     r.round = 0;
     r.status = "waiting";
@@ -603,19 +746,35 @@ export class RoomManager {
     }
     this.broadcast(r);
   }
-  chat(userId: string, text: string) {
-    const r = this.rooms.get(this.membership.get(userId) ?? "");
-    const m = r?.members.get(userId);
-    if (!r || !m) throw new AppError("You are not in a room.", 404);
-    const msg = {
+  chat(userId: string, text: string, id?: string) {
+    const r = this.get(userId),
+      m = r.members.get(userId)!;
+    const message = chatSchema.parse({ code: r.code, text, id });
+    if (r.status === "cancelled") throw new AppError("This match has ended.");
+    const existing =
+      message.id && r.chatMessages?.find((msg) => msg.id === message.id);
+    if (existing) {
+      if (existing.userId !== userId || existing.text !== message.text)
+        throw new AppError("Message identifier is already in use.", 409);
+      return existing;
+    }
+    if (Date.now() - (m.lastChatAt ?? 0) < 500)
+      throw new AppError(
+        "Please wait a moment before sending another message.",
+        429,
+      );
+    const msg: ChatMessage = {
+      id: message.id ?? randomUUID(),
       userId,
       displayName: m.player.displayName,
       avatar: m.player.avatar,
-      text: text.trim().slice(0, 200),
+      text: message.text,
       at: Date.now(),
     };
+    m.lastChatAt = msg.at;
     r.chatMessages = [...(r.chatMessages ?? []).slice(-49), msg];
     this.io.to(r.code).emit("chat:message", msg);
+    this.broadcast(r);
     return msg;
   }
   disconnect(userId: string, socketId: string) {
@@ -653,6 +812,7 @@ export class RoomManager {
             )
               await this.leave(id);
         }
+        if (r.status === "paused") continue;
         // Advance from scheduled times so a cold instance catches up missed
         // deadlines instead of extending a round or restarting its answer window.
         for (let step = 0; step < r.settings.rounds * 2 + 4; step++) {
@@ -781,14 +941,19 @@ export class RoomManager {
       on("room:ready", z.object({ ready: z.boolean() }), (d) =>
         this.ready(userId, d.ready),
       );
+      on("room:pause", empty, () => this.pause(userId));
+      on("room:resume", empty, () => this.resume(userId));
       on("match:start", empty, () => this.start(userId));
       on("match:rematch", empty, () => this.rematch(userId));
+      on("match:restart", empty, () => this.restart(userId));
+      on("match:restart-request", empty, () => this.requestRestart(userId));
+      on("match:cancel", empty, () => this.cancel(userId));
       on("answer:submit", answerSchema, (d) => this.submit(userId, d));
-      on(
-        "chat:send",
-        z.object({ code: z.string().min(6).max(12), text: z.string().min(1).max(200) }),
-        (d) => this.chat(userId, d.text),
-      );
+      on("chat:send", chatSchema, (d) => {
+        if (this.get(userId).code !== d.code)
+          throw new AppError("You are not in this room.", 403);
+        return this.chat(userId, d.text, d.id);
+      });
       socket.on("disconnect", () => this.disconnect(userId, socket.id));
     });
   }

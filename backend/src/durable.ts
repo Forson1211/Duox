@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   answerSchema,
+  chatSchema,
   roomSchema,
   type ClientEvents,
   type RoomState,
@@ -176,12 +177,15 @@ export class DurableRooms {
         result = await action(manager);
         const live = manager.rooms.get(code);
         if (live) this.touch(live, userId);
+        const state = live
+          ? { ...manager.state(live), revision: doc.revision + 1 }
+          : null;
         return {
           data:
             result && typeof result === "object" && "code" in result && live
-              ? manager.state(live)
+              ? state
               : result,
-          room: live && live.members.has(userId) ? manager.state(live) : null,
+          room: live && live.members.has(userId) ? state : null,
         };
       } finally {
         try {
@@ -231,7 +235,7 @@ export class DurableRooms {
     }
     const manager = this.manager(snapshot);
     try {
-      return manager.state(manager.get(userId));
+      return { ...manager.state(manager.get(userId)), revision: doc.revision };
     } finally {
       manager.close();
     }
@@ -266,7 +270,7 @@ export class DurableRooms {
             memberIds: [userId],
             expiresAt: new Date(room.expiresAt),
           });
-          const result = manager.state(room);
+          const result = { ...manager.state(room), revision: 0 };
           return { data: result, room: result };
         } finally {
           manager.close();
@@ -309,14 +313,26 @@ export class DurableRooms {
           return manager.rematch(userId);
         case "answer:submit":
           return manager.submit(userId, answerSchema.parse(payload));
+        case "room:pause":
+          empty.parse(payload);
+          return manager.pause(userId);
+        case "room:resume":
+          empty.parse(payload);
+          return manager.resume(userId);
+        case "match:restart":
+          empty.parse(payload);
+          return manager.restart(userId);
+        case "match:restart-request":
+          empty.parse(payload);
+          return manager.requestRestart(userId);
+        case "match:cancel":
+          empty.parse(payload);
+          return manager.cancel(userId);
         case "chat:send": {
-          const { text } = z
-            .object({
-              code: z.string().min(6).max(12),
-              text: z.string().min(1).max(200),
-            })
-            .parse(payload);
-          return manager.chat(userId, text);
+          const data = chatSchema.parse(payload);
+          if (manager.get(userId).code !== data.code)
+            throw new AppError("You are not in this room.", 403);
+          return manager.chat(userId, data.text, data.id);
         }
         default:
           throw new AppError("Unknown game action.", 400);

@@ -1,11 +1,18 @@
 import { io, type Socket } from "socket.io-client";
-import type { ClientEvents, ServerEvents, RoomState, ChatMessage } from "@duo-clash/shared";
+import {
+  GAME_PROTOCOL_VERSION,
+  type ClientEvents,
+  type ServerEvents,
+  type RoomState,
+  type ChatMessage,
+} from "@duo-clash/shared";
 import { api, post, ApiError } from "./api";
 
 type Events = {
   connect: () => void;
   disconnect: (reason: string) => void;
   connect_error: () => void;
+  "update:required": () => void;
   "room:state": (room: RoomState | null) => void;
   "room:error": (message: string) => void;
   "chat:message": (msg: ChatMessage) => void;
@@ -20,6 +27,7 @@ export class GameConnection {
   private timer?: ReturnType<typeof setTimeout>;
   private epoch = 0;
   private mutations = 0;
+  private commands: Promise<unknown> = Promise.resolve();
   private reading = false;
   private room: RoomState | null = null;
   on<E extends keyof Events>(event: E, listener: Events[E]) {
@@ -39,8 +47,12 @@ export class GameConnection {
   }
   private async start() {
     try {
-      const health = await api<{ transport?: string }>("/health");
+      const health = await api<{ transport?: string; gameProtocol?: number }>(
+        "/health",
+      );
       if (this.stopped) return;
+      if ((health.gameProtocol ?? 0) > GAME_PROTOCOL_VERSION)
+        this.emit("update:required");
       this.http = health.transport === "http";
       if (this.http) {
         await this.poll();
@@ -62,7 +74,9 @@ export class GameConnection {
       socket.on("connect_error", () => this.emit("connect_error"));
       socket.on("room:state", (room) => this.emit("room:state", room));
       socket.on("room:error", (message) => this.emit("room:error", message));
-      socket.on("chat:message" as any, (msg: ChatMessage) => this.emit("chat:message", msg));
+      socket.on("chat:message", (msg: ChatMessage) =>
+        this.emit("chat:message", msg),
+      );
       socket.connect();
     } catch {
       if (this.stopped) return;
@@ -72,6 +86,17 @@ export class GameConnection {
   }
   private apply(room: RoomState | null) {
     const previous = this.room;
+    if (
+      room &&
+      previous &&
+      room.code === previous.code &&
+      room.revision !== undefined &&
+      previous.revision !== undefined &&
+      room.revision < previous.revision
+    )
+      return;
+    if ((room?.protocolVersion ?? 0) > GAME_PROTOCOL_VERSION)
+      this.emit("update:required");
     this.room = room;
     if (room || previous) this.emit("room:state", room);
   }
@@ -125,8 +150,18 @@ export class GameConnection {
       if (!this.stopped) this.schedule(delay);
     }
   }
-  async request<T>(event: keyof ClientEvents, payload: unknown): Promise<T> {
-    if (!this.connected)
+  request<T>(event: keyof ClientEvents, payload: unknown): Promise<T> {
+    const next = this.commands
+      .catch(() => undefined)
+      .then(() => this.performRequest<T>(event, payload));
+    this.commands = next;
+    return next;
+  }
+  private async performRequest<T>(
+    event: keyof ClientEvents,
+    payload: unknown,
+  ): Promise<T> {
+    if (!this.connected || this.stopped)
       throw new Error("Connection lost. Wait for the server to reconnect.");
     if (!this.http)
       return new Promise<T>((resolve, reject) => {

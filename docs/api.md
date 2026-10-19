@@ -95,3 +95,13 @@ These authenticated routes use the same session cookie and command schemas:
 - `GET /users/me/stats` returns `{bestScore,rank,winRate}` from persisted results and account counters. Private profiles have a null public rank.
 
 Room snapshots and answers are never returned directly. The current permitted challenge is serialized through the same safe view used by Socket.IO.
+
+## Room controls, chat, and discovery
+
+Both transports accept `room:pause`, `room:resume`, `match:restart`, `match:restart-request`, and `match:cancel`, each with `{}`. Any member may pause/resume; restart and cancel require the host. Guests use restart-request, which appears to the host. Restart allocates a new match ID and begins at round one. A missing opponent returns ranked play to the lobby. `room:leave` works during play, ends the unfinished match, removes the departing player, and transfers host status if necessary. No unfinished scores are awarded.
+
+`RoomState.pause` contains `{byId,at,phase}`. Resume shifts the deadline, start, viewing period, random reflex signal, and pending phase transition by the paused duration. Answers are rejected while paused. HTTP states include a monotonically increasing revision so old responses cannot overwrite a later pause, restart, or chat.
+
+`chat:send` accepts `{code,text,id?}` (1-500 trimmed characters, optional UUID for deduplication). Senders are authenticated members; sender details are assigned on the server. The room retains the last 50 messages. The room snapshot is authoritative for both transports, with unread badges/previews in the UI. Chat input does not activate gameplay keyboard shortcuts.
+
+`GET /users/discover/all?q=&page=1` lists active registered players, newest first, with 20 per page. Results exclude yourself, existing friendships/requests (shown in Friends), suspended users, and blocks in either direction. Both public and private accounts return only id, username, displayName, avatar, visibility, and current presence. Email, passwords, ratings, and private statistics are excluded.

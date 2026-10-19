@@ -1,9 +1,16 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { createApplication } from "../src/app.js";
-import { allModels, LiveGameRoom, MatchResult, User } from "../src/models.js";
+import {
+  allModels,
+  LiveGameRoom,
+  MatchResult,
+  Match,
+  User,
+} from "../src/models.js";
 import { seedContent } from "../src/content.js";
 import type { RoomState, GameId } from "@duo-clash/shared";
 let mongo: MongoMemoryReplSet;
@@ -295,5 +302,294 @@ describe("durable multiplayer across independent API instances", () => {
       (await request(apps[2].app).get(path).set("Cookie", guest.cookie)).status,
     ).toBe(403);
     await action(0, host.cookie, "room:leave");
+  });
+  for (const game of ["memory-rush", "reflex-race"] as const) {
+    it(
+      "freezes and restores all " + game + " clocks across instances",
+      async () => {
+        const player = await account();
+        const created = await action(
+          0,
+          player.cookie,
+          "room:create",
+          settings(game),
+        );
+        const code = created.body.room.code;
+        await action(0, player.cookie, "match:start");
+        const playing = await until(
+          player.cookie,
+          (r) => r.status === "playing",
+        );
+        const before = (await LiveGameRoom.findById(code).lean())!.snapshot
+          .secret;
+        expect((await action(1, player.cookie, "room:pause")).status).toBe(200);
+        expect((await sync(2, player.cookie))!.status).toBe("paused");
+        expect(
+          (
+            await action(2, player.cookie, "answer:submit", {
+              code,
+              roundId: playing.challenge!.id,
+              value: before.answer,
+            })
+          ).status,
+        ).toBe(400);
+        const shifts: Record<string, number> = {
+          "snapshot.pause.at": -60000,
+          "snapshot.secret.challenge.startedAt": -60000,
+          "snapshot.secret.challenge.deadline": -60000,
+        };
+        if (game === "memory-rush")
+          shifts["snapshot.secret.challenge.showUntil"] = -60000;
+        else shifts["snapshot.secret.signalAt"] = -60000;
+        await LiveGameRoom.updateOne({ _id: code }, { $inc: shifts });
+        expect((await sync(0, player.cookie))!.status).toBe("paused");
+        const resumed = await action(2, player.cookie, "room:resume");
+        expect(resumed.status).toBe(200);
+        expect(resumed.body.room.status).toBe("playing");
+        const after = (await LiveGameRoom.findById(code).lean())!.snapshot
+          .secret;
+        expect(after.challenge.deadline).toBeGreaterThan(Date.now());
+        expect(after.challenge.deadline - after.challenge.startedAt).toBe(
+          before.challenge.deadline - before.challenge.startedAt,
+        );
+        if (game === "memory-rush")
+          expect(after.challenge.showUntil - after.challenge.startedAt).toBe(
+            before.challenge.showUntil - before.challenge.startedAt,
+          );
+        else {
+          expect(after.signalAt - after.challenge.startedAt).toBe(
+            before.signalAt - before.challenge.startedAt,
+          );
+          expect(resumed.body.room.challenge).not.toHaveProperty("signalAt");
+        }
+        await action(0, player.cookie, "room:leave");
+      },
+    );
+  }
+  it("resumes the countdown instead of skipping the first round", async () => {
+    const player = await account();
+    await action(0, player.cookie, "room:create", settings("code-breaker"));
+    await action(0, player.cookie, "match:start");
+    const room = await sync(1, player.cookie);
+    // Isolated timing is short; use the private snapshot to test a paused countdown deterministically.
+    await LiveGameRoom.updateOne(
+      { _id: room!.code },
+      {
+        $set: {
+          "snapshot.status": "starting",
+          "snapshot.round": 0,
+          "snapshot.nextAt": Date.now() + 3000,
+        },
+      },
+    );
+    expect(
+      (await action(1, player.cookie, "room:pause")).body.room.pause.phase,
+    ).toBe("starting");
+    const resumed = await action(2, player.cookie, "room:resume");
+    expect(resumed.body.room.status).toBe("starting");
+    expect(resumed.body.room.round).toBe(0);
+    await action(0, player.cookie, "room:leave");
+  });
+  it("restarts from round one with a new match id and no stale scores", async () => {
+    const host = await account(),
+      guest = await account();
+    const created = await action(0, host.cookie, "room:create", {
+      ...settings("number-circuit", 2),
+      rounds: 2,
+    });
+    const code = created.body.room.code;
+    await action(1, guest.cookie, "room:join", { code });
+    await action(1, guest.cookie, "room:ready", { ready: true });
+    await action(0, host.cookie, "match:start");
+    const playing = await until(host.cookie, (r) => r.status === "playing");
+    const answer = (await LiveGameRoom.findById(code).lean())!.snapshot.secret
+      .answer;
+    await action(1, host.cookie, "answer:submit", {
+      code,
+      roundId: playing.challenge!.id,
+      value: answer,
+    });
+    expect((await action(2, guest.cookie, "match:restart")).status).toBe(403);
+    expect(
+      (await action(2, guest.cookie, "match:restart-request")).status,
+    ).toBe(200);
+    expect((await sync(0, host.cookie))!.restartRequestedBy).toBe(guest.id);
+    await action(1, guest.cookie, "room:pause");
+    expect((await action(2, host.cookie, "match:restart")).status).toBe(200);
+    const restarted = await until(host.cookie, (r) => r.status === "playing");
+    expect(restarted.id).not.toBe(playing.id);
+    expect(restarted.round).toBe(1);
+    expect(restarted.challenge!.gameId).toBe("number-circuit");
+    expect(restarted.results).toEqual([]);
+    expect(restarted.submitted).toEqual([]);
+    expect(restarted.players.every((p) => p.score === 0)).toBe(true);
+    expect(restarted.pause).toBeUndefined();
+    expect(restarted.persisted).toBe(false);
+    expect((await Match.findById(playing.id))!.status).toBe("cancelled");
+    expect(await MatchResult.countDocuments({ matchId: playing.id })).toBe(0);
+    await action(0, host.cookie, "room:leave");
+    await action(1, guest.cookie, "room:leave");
+  });
+  it("lets a guest quit an active match without trapping the other player or inventing a result", async () => {
+    const host = await account(),
+      guest = await account();
+    const created = await action(0, host.cookie, "room:create", {
+      ...settings("code-breaker", 2),
+      ranked: true,
+    });
+    const code = created.body.room.code;
+    await action(1, guest.cookie, "room:join", { code });
+    await action(1, guest.cookie, "room:ready", { ready: true });
+    await action(0, host.cookie, "match:start");
+    await until(host.cookie, (r) => r.status === "playing");
+    expect((await action(1, guest.cookie, "match:cancel")).status).toBe(403);
+    expect((await action(2, guest.cookie, "room:leave")).status).toBe(200);
+    expect(await sync(0, guest.cookie)).toBeNull();
+    const cancelled = (await sync(1, host.cookie))!;
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.players).toHaveLength(1);
+    expect(cancelled.cancelReason).toContain("left the match");
+    expect(await MatchResult.countDocuments({ matchId: cancelled.id })).toBe(0);
+    expect((await User.findById(host.id))!.matches).toBe(0);
+    expect(
+      (await action(2, guest.cookie, "room:create", settings("word-blitz")))
+        .status,
+    ).toBe(200);
+    await action(1, guest.cookie, "room:leave");
+    expect((await action(2, host.cookie, "match:restart")).status).toBe(200);
+    expect((await sync(1, host.cookie))!.status).toBe("waiting");
+    expect((await action(0, guest.cookie, "room:join", { code })).status).toBe(
+      200,
+    );
+    await action(1, guest.cookie, "room:leave");
+    await action(0, host.cookie, "room:leave");
+  });
+  it("delivers authenticated chat once across instances and restores the conversation", async () => {
+    const host = await account(),
+      guest = await account(),
+      outsider = await account();
+    const created = await action(
+      0,
+      host.cookie,
+      "room:create",
+      settings("code-breaker", 2),
+    );
+    const code = created.body.room.code;
+    await action(1, guest.cookie, "room:join", { code });
+    expect(
+      (
+        await action(2, outsider.cookie, "chat:send", {
+          code,
+          text: "Intruder",
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await action(1, host.cookie, "chat:send", { code, text: "   " })).status,
+    ).toBe(400);
+    const id = randomUUID();
+    expect(
+      (
+        await action(0, host.cookie, "chat:send", {
+          code,
+          id,
+          text: "Hello from host",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await action(1, host.cookie, "chat:send", {
+          code,
+          id,
+          text: "Hello from host",
+        })
+      ).status,
+    ).toBe(200);
+    const received = (await sync(2, guest.cookie))!.chatMessages!;
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      id,
+      userId: host.id,
+      text: "Hello from host",
+    });
+    const reply = await action(2, guest.cookie, "chat:send", {
+      code,
+      id: randomUUID(),
+      text: "Hello back",
+      userId: host.id,
+    });
+    expect(reply.status).toBe(200);
+    expect(reply.body.data.userId).toBe(guest.id);
+    expect((await sync(0, host.cookie))!.chatMessages).toHaveLength(2);
+    expect(
+      (
+        await action(1, host.cookie, "chat:send", {
+          code: "DUO-ZZZZZZ",
+          text: "Wrong room",
+        })
+      ).status,
+    ).toBe(403);
+    await Promise.all(apps.splice(0).map((app) => app.close()));
+    for (let i = 0; i < 3; i++)
+      apps.push(
+        createApplication({
+          durableRooms: true,
+          timing: { starting: 25, results: 35 },
+        }),
+      );
+    expect(
+      (await sync(2, guest.cookie))!.chatMessages!.map((m) => m.text),
+    ).toEqual(["Hello from host", "Hello back"]);
+    expect((await action(0, host.cookie, "match:cancel")).status).toBe(200);
+    expect((await sync(2, guest.cookie))!.status).toBe("cancelled");
+    expect(
+      (await action(1, guest.cookie, "chat:send", { code, text: "Ended" }))
+        .status,
+    ).toBe(400);
+    await action(0, host.cookie, "room:leave");
+    await action(1, guest.cookie, "room:leave");
+  });
+  it("keeps completed results while a restarted match earns a fresh result", async () => {
+    const player = await account();
+    const created = await action(
+      0,
+      player.cookie,
+      "room:create",
+      settings("number-circuit"),
+    );
+    const code = created.body.room.code;
+    await action(0, player.cookie, "match:start");
+    let id = "";
+    let points = 0;
+    for (let run = 0; run < 2; run++) {
+      const playing = await until(player.cookie, (r) => r.status === "playing");
+      const doc = await LiveGameRoom.findById(code).lean();
+      await action(1, player.cookie, "answer:submit", {
+        code,
+        roundId: playing.challenge!.id,
+        value: doc!.snapshot.secret.answer,
+      });
+      const completed = await until(
+        player.cookie,
+        (r) => r.status === "completed",
+      );
+      expect(completed.persisted).toBe(true);
+      expect((await User.findById(player.id))!.matches).toBe(run + 1);
+      if (run === 0) {
+        id = completed.id;
+        points = (await User.findById(player.id))!.points;
+        expect((await action(2, player.cookie, "match:restart")).status).toBe(
+          200,
+        );
+      } else {
+        expect(completed.id).not.toBe(id);
+        expect((await User.findById(player.id))!.points).toBeGreaterThan(
+          points,
+        );
+        expect((await Match.findById(id))!.status).toBe("completed");
+      }
+    }
+    await action(0, player.cookie, "room:leave");
   });
 });

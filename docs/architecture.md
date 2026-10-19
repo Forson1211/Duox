@@ -14,9 +14,19 @@ Helmet, explicit CORS/handshake origins, mutation Origin/Fetch Metadata checks, 
 
 Persistent Node hosting uses a 100 ms scheduler. Vercel uses durable snapshots and advances scheduled transitions during authenticated HTTP commands/polls, catching up missed deadlines without extending rounds. Clients offset display clocks using server timestamps. All answered players can close a round early. One valid answer per participant/round is accepted; old IDs, invalid types, duplicates, late answers, and nonmembers are rejected. Disconnecting does not extend time. Reconnection restores current state and submitted status.
 
-Waiting-room disconnects have a 30-second grace period. Leaving transfers host status to the next player. Active matches continue and unanswered players score zero. Rooms expire after two hours. A rematch transaction creates a new match ID, retains the code, and resets scores, readiness, answers, rounds, and schedules.
+Waiting-room disconnects have a 30-second grace period. Leaving transfers host status to the next player. Disconnects alone leave active match clocks running; deliberately quitting ends an unfinished match for everyone without awarding partial scores. Rooms expire after two hours. A rematch transaction creates a new match ID, retains the code, and resets scores, readiness, answers, rounds, and schedules.
 
 All games use `newRound`, `safeChallenge`, and `scoreAnswer`. Quiz, word, arithmetic, and code answers and future reflex signal times stay private. Memory sequences are visible during the intentional viewing phase and removed from later snapshots. Automated play is not reliably distinguishable from human input in this release.
+
+## Shared controls and room chat
+
+Both players answer every round simultaneously. Each member can pause or resume; pausing records the current phase and freezes answer eligibility, countdowns, memory viewing, reflex signals, and speed scoring. Resume shifts all relevant timestamps by the pause duration. The host can restart or cancel; guests can request a restart. Restart creates a fresh match, resets to round one, and preserves previously completed results. A cancelled match cannot award scores.
+
+Room snapshots carry the latest 50 chat messages with server-trusted sender identities and UUIDs. HTTP polling and native Socket.IO use the same snapshot history. Message UUIDs make retries idempotent, and per-member throttling limits repeated sends. Poll revisions prevent older HTTP responses from replacing newer state. Frontend commands are serialized so a delayed chat response cannot restore a room after leaving. Game keyboard shortcuts ignore chat fields and dialogs.
+
+The shared protocol version is included in health and room responses; supported clients offer a reload if a newer server protocol is detected. HTML entry points are served with no-store headers to reduce stale-client problems after deployment.
+
+Player discovery paginates all active, unblocked accounts, including private accounts, and exposes only identity and online status. It excludes the requesting user and existing friendships or pending requests. Private statistics and email addresses stay private.
 
 ## Scores and progression
 

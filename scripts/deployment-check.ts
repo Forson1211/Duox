@@ -75,7 +75,7 @@ const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({
     reducedMotion: "reduce",
-    viewport: { width: 390, height: 844 },
+    viewport: { width: 1440, height: 1000 },
   });
   const page = await context.newPage();
   page.setDefaultTimeout(45000);
@@ -152,6 +152,21 @@ try {
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(guest).toHaveURL(`${base}/app`);
+  await guest.goto(`${base}/app/friends`);
+  const discovered = guest
+    .locator(".friend-row")
+    .filter({ hasText: "Deploy Browser" });
+  await expect(
+    discovered.getByRole("button", { name: "Add friend", exact: true }),
+  ).toBeVisible();
+  await discovered
+    .getByRole("button", { name: "Add friend", exact: true })
+    .click();
+  await page.goto(`${base}/app/friends`);
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  console.log(
+    "PASS: automatic player discovery and friend requests between new accounts",
+  );
   await page.goto(`${base}/app/rooms/create`);
   await page.getByLabel("Room name").fill("Production six game duel");
   await page.getByLabel("Rounds", { exact: true }).selectOption("6");
@@ -178,7 +193,104 @@ try {
     mongoose.connection
       .db!.collection("livegamerooms")
       .findOne({ _id: code } as any);
-  let secret = (await roomDoc())!.snapshot.secret;
+  for (const player of [page, guest]) {
+    for (const name of ["Pause", "Restart", "Chat", "Quit game"])
+      await expect(
+        player.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+  }
+  await expect(
+    page.getByRole("button", { name: "Cancel game", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("Hello from the desktop player");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(
+    guest.getByRole("button", { name: /Read message/ }),
+  ).toBeVisible();
+  await guest.getByRole("button", { name: /Read message/ }).click();
+  await expect(guest.getByRole("log")).toContainText(
+    "Hello from the desktop player",
+  );
+  await guest
+    .getByLabel("Message", { exact: true })
+    .fill("Hello from the mobile player");
+  await guest
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await expect(page.getByRole("log")).toContainText(
+    "Hello from the mobile player",
+  );
+  await page.screenshot({
+    path: "artifacts/room-chat-desktop.png",
+    fullPage: true,
+  });
+  await guest.screenshot({
+    path: "artifacts/room-chat-mobile.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Close chat" }).click();
+  await guest.getByRole("button", { name: "Close chat" }).click();
+  await guest.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(
+    page.getByText("Game paused for everyone", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/game-controls-desktop.png",
+    fullPage: true,
+  });
+  await guest.screenshot({
+    path: "artifacts/game-controls-mobile.png",
+    fullPage: true,
+  });
+  await guest.reload({ waitUntil: "domcontentloaded" });
+  await expect(
+    guest.getByRole("button", { name: "Resume game", exact: true }),
+  ).toBeVisible();
+  await guest.getByRole("button", { name: /^Chat/ }).click();
+  await expect(guest.getByRole("log")).toContainText(
+    "Hello from the desktop player",
+  );
+  await expect(guest.getByRole("log")).toContainText(
+    "Hello from the mobile player",
+  );
+  await expect(
+    guest
+      .getByRole("log")
+      .getByText("Hello from the desktop player", { exact: true }),
+  ).toHaveCount(1);
+  await guest.getByRole("button", { name: "Close chat" }).click();
+  await guest.getByRole("button", { name: "Resume game", exact: true }).click();
+  await expect(page.locator(".quiz-options")).toBeVisible();
+  const firstMatch = (await roomDoc())!.snapshot.id;
+  await guest.getByRole("button", { name: "Restart", exact: true }).click();
+  await expect(
+    page.getByText("Deploy Rival asked to restart the match."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Restart", exact: true }).click();
+  await page.getByRole("button", { name: "Restart now", exact: true }).click();
+  await expect
+    .poll(async () => (await roomDoc())!.snapshot.id)
+    .not.toBe(firstMatch);
+  await expect
+    .poll(async () => (await roomDoc())!.snapshot.status)
+    .toBe("playing");
+  const reset = (await roomDoc())!.snapshot;
+  expect(reset.id).not.toBe(firstMatch);
+  expect(reset.round).toBe(1);
+  expect(reset.results).toEqual([]);
+  await expect(
+    page.locator(`[data-round-id="${reset.secret.challenge.id}"]`),
+  ).toBeVisible();
+  await expect(
+    guest.locator(`[data-round-id="${reset.secret.challenge.id}"]`),
+  ).toBeVisible();
+  console.log(
+    "PASS: visible desktop/mobile controls, two-way chat, paused reload, timer resume, restart request and fresh round one across workers",
+  );
+  let secret = reset.secret;
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator(".quiz-options")).toBeVisible();
   await page.locator(".quiz-options button").nth(secret.answer).click();
@@ -206,6 +318,18 @@ try {
     await player.getByLabel("Your answer").fill(secret.answer.toLowerCase());
     await player.getByRole("button", { name: "Lock it in" }).click();
   }
+  await expect(guest.locator(".reflex-pad")).toBeVisible({ timeout: 15000 });
+  await guest.getByRole("button", { name: /^Chat/ }).click();
+  await guest.getByLabel("Message", { exact: true }).fill("typing");
+  await guest.getByLabel("Message", { exact: true }).press("Space");
+  const typingState = await guestContext.request
+    .get(`${base}/api/v1/realtime/state`)
+    .then((r) => r.json());
+  const rival = typingState.room.players.find(
+    (p: any) => p.username === "deployrival",
+  );
+  expect(typingState.room.submitted).not.toContain(rival.id);
+  await guest.getByRole("button", { name: "Close chat" }).click();
   await expect(page.locator(".reflex-pad.go")).toBeVisible({ timeout: 15000 });
   await page.waitForTimeout(120);
   await page.locator(".reflex-pad.go").click();
@@ -213,13 +337,19 @@ try {
   await guest.locator(".reflex-pad.go").click();
   await expect(page.locator(".number-circuit")).toBeVisible({ timeout: 15000 });
   secret = (await roomDoc())!.snapshot.secret;
-  await page.screenshot({
+  await guest.screenshot({
     path: "artifacts/number-circuit-mobile.png",
     fullPage: true,
   });
   for (const player of [page, guest])
     await player.locator(".quiz-options button").nth(secret.answer).click();
   await expect(page.locator(".code-breaker")).toBeVisible({ timeout: 15000 });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator(".code-clue").first()).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/code-breaker-desktop.png",
+    fullPage: true,
+  });
   await page.setViewportSize({ width: 320, height: 844 });
   expect(
     await page.evaluate(
@@ -231,12 +361,21 @@ try {
     fullPage: true,
   });
   secret = (await roomDoc())!.snapshot.secret;
-  for (const player of [page, guest]) {
-    await player
-      .getByLabel("Your secret code", { exact: true })
-      .fill(secret.answer);
-    await player.getByRole("button", { name: "Crack the code" }).click();
-  }
+  await expect(page.locator(".code-clue")).toHaveCount(
+    secret.challenge.clues.length,
+  );
+  await guest
+    .getByLabel("Your secret code", { exact: true })
+    .fill(secret.answer);
+  await guest.getByRole("button", { name: "Crack the code" }).click();
+  await expect(
+    page.getByLabel("Your secret code", { exact: true }),
+  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: /^Chat/ })).toBeVisible();
+  await page
+    .getByLabel("Your secret code", { exact: true })
+    .fill(secret.answer);
+  await page.getByRole("button", { name: "Crack the code" }).click();
   await expect(
     page.getByRole("heading", { name: "The crown is yours." }),
   ).toBeVisible({ timeout: 20000 });
@@ -266,8 +405,26 @@ try {
   await expect(
     guest.getByText("Good company. Great competition."),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Leave room", exact: true }).click();
-  await guest.getByRole("button", { name: "Leave room", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel game", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel match", exact: true }).click();
+  await expect(
+    guest.getByRole("heading", { name: "This match has ended." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Restart", exact: true }).click();
+  await page.getByRole("button", { name: "Restart now", exact: true }).click();
+  await expect(guest.locator(".quiz-options")).toBeVisible();
+  await guest.getByRole("button", { name: "Quit game", exact: true }).click();
+  await guest.getByRole("button", { name: "Quit now", exact: true }).click();
+  await expect(guest).toHaveURL(`${base}/app`);
+  await expect(
+    page.getByRole("heading", { name: "This match has ended." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Quit game", exact: true }).click();
+  await page.getByRole("button", { name: "Quit now", exact: true }).click();
+  await expect(page).toHaveURL(`${base}/app`);
+  console.log(
+    "PASS: shared cancellation, restarting a cancelled game, and quitting during active play without trapping either player",
+  );
   await expect(page.locator(".resume-banner")).toHaveCount(0);
   await expect(guest.locator(".resume-banner")).toHaveCount(0);
   expect(

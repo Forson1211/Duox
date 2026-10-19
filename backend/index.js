@@ -121335,6 +121335,7 @@ var import_dist = __toESM(require_dist3(), 1);
 var { Server, Namespace, Socket } = import_dist.default;
 
 // ../shared/dist/index.js
+var GAME_PROTOCOL_VERSION = 2;
 var gameIds = [
   "quick-quiz",
   "memory-rush",
@@ -121460,6 +121461,11 @@ function weekStart(now = /* @__PURE__ */ new Date()) {
   d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
   return d;
 }
+var chatSchema = external_exports.object({
+  code: external_exports.string().trim().toUpperCase().regex(/^DUO-[A-Z2-9]{6}$/),
+  text: external_exports.string().trim().min(1, "Enter a message.").max(500),
+  id: external_exports.string().uuid().optional()
+});
 
 // src/models.ts
 var import_mongoose = __toESM(require_mongoose2(), 1);
@@ -122431,6 +122437,11 @@ var RoomManager = class {
       connected: (room.members.get(p.id)?.sockets.size ?? 0) > 0
     })) : activePlayers;
     const top = Math.max(...players.map((p) => p.score));
+    const pause2 = room.pause ?? (room.status === "paused" ? {
+      byId: room.hostId,
+      phase: room.round === 0 ? "starting" : "playing",
+      at: room.secret ? room.secret.challenge.deadline - (room.pausedRemaining ?? 0) : Date.now()
+    } : void 0);
     return {
       id: room.id,
       code: room.code,
@@ -122439,7 +122450,7 @@ var RoomManager = class {
       status: room.status,
       players,
       round: room.round,
-      challenge: room.secret && room.status === "playing" ? safeChallenge(room.secret) : null,
+      challenge: room.secret && (room.status === "playing" || room.status === "paused" && pause2?.phase === "playing") ? safeChallenge(room.secret, pause2?.at ?? Date.now()) : null,
       submitted: [...room.answers.keys()],
       results: room.results,
       serverNow: Date.now(),
@@ -122447,7 +122458,11 @@ var RoomManager = class {
       winnerIds: room.status === "completed" ? players.filter((p) => p.score === top).map((p) => p.id) : [],
       persisted: room.persisted,
       ratingChanges: room.ratingChanges,
-      chatMessages: room.chatMessages ?? []
+      chatMessages: room.chatMessages ?? [],
+      pause: pause2,
+      restartRequestedBy: room.restartRequestedBy,
+      cancelReason: room.cancelReason,
+      protocolVersion: GAME_PROTOCOL_VERSION
     };
   }
   broadcast(room) {
@@ -122600,10 +122615,12 @@ var RoomManager = class {
   async leave(userId) {
     const room = this.get(userId);
     const active = !["waiting", "completed", "cancelled"].includes(room.status);
-    if (active)
-      throw new AppError(
-        "A match is in progress. You can reconnect until it finishes."
+    if (active && !room.persisted) {
+      await this.cancelRoom(
+        room,
+        room.members.get(userId).player.displayName + " left the match."
       );
+    } else if (room.persisted) room.status = "completed";
     const m = room.members.get(userId);
     for (const id of m.sockets)
       await this.io.sockets.sockets.get(id)?.leave(room.code);
@@ -122616,10 +122633,99 @@ var RoomManager = class {
         { status: "cancelled" }
       );
     } else {
-      if (room.hostId === userId)
+      if (room.hostId === userId) {
         room.hostId = room.members.keys().next().value;
+        room.members.get(room.hostId).ready = true;
+      }
       this.broadcast(room);
     }
+  }
+  pause(userId) {
+    const r = this.get(userId);
+    if (r.status === "paused") return;
+    if (!["playing", "starting", "round-results"].includes(r.status) || r.persisted || r.saving)
+      throw new AppError("This match cannot be paused now.");
+    if (r.status === "playing" && r.secret && Date.now() >= r.secret.challenge.deadline)
+      throw new AppError(
+        "This round has just ended. Try again in the next round."
+      );
+    r.pause = {
+      byId: userId,
+      at: Date.now(),
+      phase: r.status
+    };
+    r.status = "paused";
+    this.broadcast(r);
+  }
+  resume(userId) {
+    const r = this.get(userId);
+    if (r.status !== "paused") throw new AppError("Match is not paused.");
+    const paused = this.state(r).pause;
+    const elapsed = Math.max(0, Date.now() - paused.at);
+    if (r.secret) {
+      const c = r.secret.challenge;
+      c.startedAt += elapsed;
+      c.deadline += elapsed;
+      if (c.showUntil !== void 0) c.showUntil += elapsed;
+      if (c.signalAt !== void 0) c.signalAt += elapsed;
+      if (r.secret.signalAt !== void 0) r.secret.signalAt += elapsed;
+    }
+    if (r.nextAt !== void 0) r.nextAt += elapsed;
+    r.status = paused.phase;
+    r.pause = void 0;
+    r.pausedRemaining = void 0;
+    this.broadcast(r);
+  }
+  async cancelRoom(r, reason) {
+    if (r.persisted || r.saving)
+      throw new AppError("This match has finished. Its saved scores are kept.");
+    const previous = r.status;
+    r.status = "cancelled";
+    try {
+      await Match.updateOne(
+        { _id: r.id, status: { $ne: "completed" } },
+        { $set: { status: "cancelled" } }
+      );
+    } catch (error2) {
+      r.status = previous;
+      throw error2;
+    }
+    r.pause = void 0;
+    r.nextAt = void 0;
+    r.restartRequestedBy = void 0;
+    r.cancelReason = reason;
+    this.broadcast(r);
+  }
+  async cancel(userId) {
+    const r = this.get(userId);
+    if (r.hostId !== userId)
+      throw new AppError("Only the host can cancel the match.", 403);
+    if (r.status === "cancelled") return;
+    await this.cancelRoom(r, "The host cancelled this match.");
+  }
+  requestRestart(userId) {
+    const r = this.get(userId);
+    if (!["starting", "playing", "paused", "round-results"].includes(r.status))
+      throw new AppError("There is no active match to restart.");
+    r.restartRequestedBy = userId;
+    this.broadcast(r);
+  }
+  async restart(userId) {
+    return this.exclusive(userId, async () => {
+      const r = this.get(userId);
+      if (r.hostId !== userId)
+        throw new AppError(
+          "Only the host can restart the match. Send a restart request instead.",
+          403
+        );
+      if (r.saving || this.busy.has(r.code))
+        throw new AppError("The round is changing. Please try again.", 409);
+      await this.rematchRoom(userId, true);
+      if ([...r.members.values()].every((m) => m.sockets.size > 0) && (!r.settings.ranked || r.members.size === 2)) {
+        for (const m of r.members.values()) m.ready = true;
+        await this.startMatch(userId);
+      }
+    });
   }
   ready(userId, ready) {
     const r = this.get(userId);
@@ -122672,6 +122778,7 @@ var RoomManager = class {
     if (r.answers.size === r.members.size) await this.endRound(r);
   }
   async beginRound(r, startedAt = Date.now()) {
+    const expected = { id: r.id, status: r.status, round: r.round };
     const nextRound = r.round + 1;
     const game = r.settings.gameIds[(nextRound - 1) % r.settings.gameIds.length];
     const secret = await newRound(
@@ -122682,6 +122789,8 @@ var RoomManager = class {
       startedAt,
       r.usedQuizPrompts ?? []
     );
+    if (r.id !== expected.id || r.status !== expected.status || r.round !== expected.round)
+      return;
     r.round = nextRound;
     r.secret = secret;
     if (game === "quick-quiz") {
@@ -122827,17 +122936,21 @@ var RoomManager = class {
   async rematch(userId) {
     return this.exclusive(userId, () => this.rematchRoom(userId));
   }
-  async rematchRoom(userId) {
+  async rematchRoom(userId, restart = false) {
     const r = this.get(userId);
     if (r.hostId !== userId)
       throw new AppError("Only the host can set up a rematch.", 403);
-    if (r.status !== "completed" || !r.persisted)
+    if (!restart && (r.status !== "completed" || !r.persisted))
       throw new AppError("Wait for the results to save.");
+    if (r.saving) throw new AppError("Wait for the results to save.");
     const nextId = randomUUID2();
     await import_mongoose2.default.connection.transaction(async (session) => {
       await Match.updateOne(
         { _id: r.id },
-        { $unset: { roomCode: 1 } },
+        {
+          $unset: { roomCode: 1 },
+          ...!r.persisted ? { $set: { status: "cancelled" } } : {}
+        },
         { session }
       );
       await Match.create(
@@ -122855,6 +122968,10 @@ var RoomManager = class {
     });
     r.id = nextId;
     r.completedPlayers = void 0;
+    r.pause = void 0;
+    r.pausedRemaining = void 0;
+    r.restartRequestedBy = void 0;
+    r.cancelReason = void 0;
     r.usedQuizPrompts = [];
     r.round = 0;
     r.status = "waiting";
@@ -122871,19 +122988,33 @@ var RoomManager = class {
     }
     this.broadcast(r);
   }
-  chat(userId, text) {
-    const r = this.rooms.get(this.membership.get(userId) ?? "");
-    const m = r?.members.get(userId);
-    if (!r || !m) throw new AppError("You are not in a room.", 404);
+  chat(userId, text, id) {
+    const r = this.get(userId), m = r.members.get(userId);
+    const message = chatSchema.parse({ code: r.code, text, id });
+    if (r.status === "cancelled") throw new AppError("This match has ended.");
+    const existing = message.id && r.chatMessages?.find((msg2) => msg2.id === message.id);
+    if (existing) {
+      if (existing.userId !== userId || existing.text !== message.text)
+        throw new AppError("Message identifier is already in use.", 409);
+      return existing;
+    }
+    if (Date.now() - (m.lastChatAt ?? 0) < 500)
+      throw new AppError(
+        "Please wait a moment before sending another message.",
+        429
+      );
     const msg = {
+      id: message.id ?? randomUUID2(),
       userId,
       displayName: m.player.displayName,
       avatar: m.player.avatar,
-      text: text.trim().slice(0, 200),
+      text: message.text,
       at: Date.now()
     };
+    m.lastChatAt = msg.at;
     r.chatMessages = [...(r.chatMessages ?? []).slice(-49), msg];
     this.io.to(r.code).emit("chat:message", msg);
+    this.broadcast(r);
     return msg;
   }
   disconnect(userId, socketId) {
@@ -122917,6 +123048,7 @@ var RoomManager = class {
             if (!m.sockets.size && m.disconnectedAt && now - m.disconnectedAt > 3e4)
               await this.leave(id);
         }
+        if (r.status === "paused") continue;
         for (let step = 0; step < r.settings.rounds * 2 + 4; step++) {
           const before = `${r.status}:${r.round}:${r.nextAt}`;
           if (r.status === "starting" && now >= r.nextAt)
@@ -123022,14 +123154,19 @@ var RoomManager = class {
         external_exports.object({ ready: external_exports.boolean() }),
         (d) => this.ready(userId, d.ready)
       );
+      on("room:pause", empty2, () => this.pause(userId));
+      on("room:resume", empty2, () => this.resume(userId));
       on("match:start", empty2, () => this.start(userId));
       on("match:rematch", empty2, () => this.rematch(userId));
+      on("match:restart", empty2, () => this.restart(userId));
+      on("match:restart-request", empty2, () => this.requestRestart(userId));
+      on("match:cancel", empty2, () => this.cancel(userId));
       on("answer:submit", answerSchema, (d) => this.submit(userId, d));
-      on(
-        "chat:send",
-        external_exports.object({ code: external_exports.string().min(6).max(12), text: external_exports.string().min(1).max(200) }),
-        (d) => this.chat(userId, d.text)
-      );
+      on("chat:send", chatSchema, (d) => {
+        if (this.get(userId).code !== d.code)
+          throw new AppError("You are not in this room.", 403);
+        return this.chat(userId, d.text, d.id);
+      });
       socket.on("disconnect", () => this.disconnect(userId, socket.id));
     });
   }
@@ -123172,9 +123309,10 @@ var DurableRooms = class {
         result = await action(manager);
         const live = manager.rooms.get(code);
         if (live) this.touch(live, userId);
+        const state = live ? { ...manager.state(live), revision: doc.revision + 1 } : null;
         return {
-          data: result && typeof result === "object" && "code" in result && live ? manager.state(live) : result,
-          room: live && live.members.has(userId) ? manager.state(live) : null
+          data: result && typeof result === "object" && "code" in result && live ? state : result,
+          room: live && live.members.has(userId) ? state : null
         };
       } finally {
         try {
@@ -123219,7 +123357,7 @@ var DurableRooms = class {
     }
     const manager = this.manager(snapshot);
     try {
-      return manager.state(manager.get(userId));
+      return { ...manager.state(manager.get(userId)), revision: doc.revision };
     } finally {
       manager.close();
     }
@@ -123250,7 +123388,7 @@ var DurableRooms = class {
             memberIds: [userId],
             expiresAt: new Date(room.expiresAt)
           });
-          const result = manager.state(room);
+          const result = { ...manager.state(room), revision: 0 };
           return { data: result, room: result };
         } finally {
           manager.close();
@@ -123292,12 +123430,26 @@ var DurableRooms = class {
           return manager.rematch(userId);
         case "answer:submit":
           return manager.submit(userId, answerSchema.parse(payload));
+        case "room:pause":
+          empty.parse(payload);
+          return manager.pause(userId);
+        case "room:resume":
+          empty.parse(payload);
+          return manager.resume(userId);
+        case "match:restart":
+          empty.parse(payload);
+          return manager.restart(userId);
+        case "match:restart-request":
+          empty.parse(payload);
+          return manager.requestRestart(userId);
+        case "match:cancel":
+          empty.parse(payload);
+          return manager.cancel(userId);
         case "chat:send": {
-          const { text } = external_exports.object({
-            code: external_exports.string().min(6).max(12),
-            text: external_exports.string().min(1).max(200)
-          }).parse(payload);
-          return manager.chat(userId, text);
+          const data = chatSchema.parse(payload);
+          if (manager.get(userId).code !== data.code)
+            throw new AppError("You are not in this room.", 403);
+          return manager.chat(userId, data.text, data.id);
         }
         default:
           throw new AppError("Unknown game action.", 400);
@@ -123407,6 +123559,7 @@ function createApplication(options = {}) {
   api.get(
     "/health",
     (_req, res) => res.status(import_mongoose3.default.connection.readyState === 1 ? 200 : 503).json({
+      gameProtocol: GAME_PROTOCOL_VERSION,
       status: import_mongoose3.default.connection.readyState === 1 ? "ok" : "unavailable",
       database: import_mongoose3.default.connection.readyState === 1 ? "connected" : "disconnected",
       service: "duo-clash-api",
@@ -123729,7 +123882,12 @@ If you did not request this, ignore this email.`
           "match:start",
           "match:rematch",
           "answer:submit",
-          "chat:send"
+          "chat:send",
+          "room:pause",
+          "room:resume",
+          "match:restart",
+          "match:restart-request",
+          "match:cancel"
         ]),
         payload: external_exports.unknown()
       }).strict().parse(req.body);
@@ -123852,29 +124010,45 @@ If you did not request this, ignore this email.`
         excludeIds.add(f.requesterId === id ? f.recipientId : f.requesterId);
       }
       for (const b of blocks) {
-        excludeIds.add(b.userId === id ? b.targetId : b.userId);
+        const blockedId = b.userId === id ? b.targetId : b.userId;
+        if (blockedId) excludeIds.add(blockedId);
       }
       const query = {
         status: "active",
-        visibility: "public",
-        _id: { $nin: [...excludeIds].map((eid) => new import_mongoose3.default.Types.ObjectId(eid)) }
+        _id: {
+          $nin: [...excludeIds].map((eid) => new import_mongoose3.default.Types.ObjectId(eid))
+        }
       };
       if (search) {
-        const escaped = [...search].map((c) => ".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92 ? "\\" + c : c).join("");
+        const escaped = [...search].map(
+          (c) => ".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92 ? "\\" + c : c
+        ).join("");
         query.$or = [
           { displayName: new RegExp(escaped, "i") },
           { username: new RegExp(escaped, "i") }
         ];
       }
       const [users, total] = await Promise.all([
-        User.find(query).sort({ points: -1 }).skip((page - 1) * 20).limit(20),
+        User.find(query).select("username displayName avatar visibility createdAt").sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 20).limit(20),
         User.countDocuments(query)
       ]);
       const onlineIds = new Set(
         [...io2.sockets.sockets.values()].map((s) => s.data.userId)
       );
+      const presence = await PlayerPresence.find({
+        _id: { $in: users.map((u) => u.id) },
+        expiresAt: { $gt: /* @__PURE__ */ new Date() }
+      }).select("_id");
+      for (const row of presence) onlineIds.add(row.id);
       res.json({
-        users: users.map((u) => ({ ...publicPlayer(u), online: onlineIds.has(u.id) })),
+        users: users.map((u) => ({
+          id: u.id,
+          username: u.username,
+          displayName: u.displayName,
+          avatar: u.avatar,
+          visibility: u.visibility,
+          online: onlineIds.has(u.id)
+        })),
         total,
         page
       });
