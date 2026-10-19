@@ -2,6 +2,7 @@
 
 ## Deployment authentication fix
 
+- Clean-install correction: synchronized the root lockfile with the backend `esbuild` dependency, including Linux build binaries. `npm ci --dry-run --ignore-scripts --no-audit --no-fund` passed after reproducing Vercel's lockfile mismatch from its build logs.
 - Vercel schema correction: `includeFiles` uses one brace-expanded glob string. Both Vercel configuration files validate against the official schema from `https://openapi.vercel.sh/vercel.json`; the previous array reproduces the reported validation error. The glob was verified to include the backend bundle and shared JavaScript/type outputs.
 - Live diagnostic: `/api/v1/health` and `/api/v1/auth/me` returned HTTP 500 with Vercel's `FUNCTION_INVOCATION_FAILED`; `/login` returned HTTP 404 at the time of inspection.
 - Strict workspace TypeScript checks passed. A final backend type check also passed after the cookie cleanup change.
