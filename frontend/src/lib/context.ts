@@ -1,12 +1,12 @@
 import { createContext, useContext } from "react";
-import type { Socket } from "socket.io-client";
+import type { GameConnection } from "./connection";
 import type {
   Account,
   RoomState,
   ClientEvents,
   ServerEvents,
 } from "@duo-clash/shared";
-export type GameSocket = Socket<ServerEvents, ClientEvents>;
+export type GameSocket = GameConnection;
 export type NotificationType = "match" | "achievement" | "friend" | "system";
 
 export interface NotificationItem {
@@ -54,20 +54,9 @@ export function command<T>(
   event: keyof ClientEvents,
   payload: unknown,
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    if (!socket?.connected)
-      return reject(
-        new Error("Connection lost. Wait for the server to reconnect."),
-      );
-    (socket.timeout(10000).emit as Function)(
-      event,
-      payload,
-      (error: Error | null, reply: { ok: boolean; data: T; error: string }) => {
-        if (error)
-          reject(new Error("The server did not respond. Please try again."));
-        else if (!reply.ok) reject(new Error(reply.error));
-        else resolve(reply.data);
-      },
+  if (!socket?.connected)
+    return Promise.reject(
+      new Error("Connection lost. Wait for the server to reconnect."),
     );
-  });
+  return socket.request<T>(event, payload);
 }

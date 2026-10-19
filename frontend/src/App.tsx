@@ -11,7 +11,7 @@ import {
   Link,
 } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { io } from "socket.io-client";
+import { createGameConnection } from "./lib/connection";
 import { NotificationCenter } from "./components/Notifications";
 import {
   Swords,
@@ -221,10 +221,8 @@ export default function App() {
   }, [location.pathname]);
   useEffect(() => {
     if (!user) return;
-    const s: GameSocket = io(import.meta.env.VITE_SOCKET_URL ?? undefined, {
-      withCredentials: true,
-      autoConnect: true,
-    });
+    const s = createGameConnection();
+    let completedId: string | undefined;
     setSocket(s);
     s.on("connect", () => {
       setConnected(true);
@@ -234,13 +232,14 @@ export default function App() {
     });
     s.on("disconnect", (reason) => {
       setConnected(false);
-      if (reason === "io server disconnect")
+      if (reason === "io server disconnect" || reason === "unauthorized")
         void query.invalidateQueries({ queryKey: ["me"] });
     });
     s.on("connect_error", () => setConnected(false));
     s.on("room:state", (r) => {
       setRoom(r);
-      if (r.status === "completed") {
+      if (r?.status === "completed" && completedId !== r.id) {
+        completedId = r.id;
         void refresh();
         const winner = r.winnerIds.includes(user.id);
         addNotification({

@@ -7,8 +7,6 @@ async function run() {
       entryPoints: ["src/index.ts"],
       outfile: "index.js",
       bundle: true,
-      // Keep runtime dependencies in their packages for reliable function tracing.
-      packages: "external",
       platform: "node",
       target: "node20",
       format: "esm",

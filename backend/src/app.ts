@@ -57,6 +57,8 @@ import {
   isAllowedOrigin,
 } from "./auth.js";
 import { RoomManager, dailyInfo } from "./rooms.js";
+import { DurableRooms } from "./durable.js";
+import { LiveGameRoom, PlayerPresence } from "./models.js";
 const wrap =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
   (req, res, next) => {
@@ -76,8 +78,10 @@ export function createApplication(
     timing?: { starting: number; results: number };
     staticDirectory?: string;
     ensureDatabase?: () => Promise<void>;
+    durableRooms?: boolean;
   } = {},
 ) {
+  const durableMode = options.durableRooms ?? !!process.env.VERCEL;
   const app = express();
   const server = http.createServer(app);
   app.disable("x-powered-by");
@@ -113,6 +117,7 @@ export function createApplication(
     rateLimit({
       windowMs: 60000,
       limit: 200,
+      skip: (req) => req.path.startsWith("/v1/realtime"),
       standardHeaders: "draft-7",
       legacyHeaders: false,
       message: { error: "Too many requests. Please try again shortly." },
@@ -143,7 +148,8 @@ export function createApplication(
     allowRequest: (req, cb) =>
       cb(null, !req.headers.origin || isAllowedOrigin(req.headers.origin)),
   });
-  const rooms = new RoomManager(io, options.timing);
+  const rooms = new RoomManager(io, options.timing, { manual: durableMode });
+  const durable = new DurableRooms(io, options.timing);
   rooms.attach();
   app.use("/api", async (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
@@ -172,6 +178,7 @@ export function createApplication(
       database:
         mongoose.connection.readyState === 1 ? "connected" : "disconnected",
       service: "duo-clash-api",
+      transport: durableMode ? "http" : "socket",
     }),
   );
   api.get("/games", (_req, res) => res.json({ games }));
@@ -509,6 +516,45 @@ export function createApplication(
   );
   api.get("/achievements", (_req, res) => res.json({ achievements }));
   api.use(requireUser);
+  api.use(
+    "/realtime",
+    rateLimit({
+      windowMs: 60000,
+      limit: 600,
+      keyGenerator: (req) => req.user!.id,
+      standardHeaders: "draft-7",
+      legacyHeaders: false,
+      message: { error: "Too many game actions. Please slow down." },
+    }),
+  );
+  api.get(
+    "/realtime/state",
+    wrap(async (req, res) => {
+      res.json({ room: await durable.sync(req.user!.id) });
+    }),
+  );
+  api.post(
+    "/realtime/command",
+    wrap(async (req, res) => {
+      const { event, payload } = z
+        .object({
+          event: z.enum([
+            "room:create",
+            "room:join",
+            "room:sync",
+            "room:leave",
+            "room:ready",
+            "match:start",
+            "match:rematch",
+            "answer:submit",
+          ]),
+          payload: z.unknown(),
+        })
+        .strict()
+        .parse(req.body);
+      res.json(await durable.execute(req.user!.id, event, payload));
+    }),
+  );
   api.get("/users/me", (req, res) => res.json({ user: account(req.user!) }));
   api.patch(
     "/users/me",
@@ -539,7 +585,7 @@ export function createApplication(
       const user = await User.findById(req.user!.id).select("+passwordHash");
       if (!user || !(await verifyPassword(password, user.passwordHash)))
         throw new AppError("Incorrect password.", 403);
-      if (rooms.membership.has(user.id))
+      if (rooms.membership.has(user.id) || (await durable.hasRoom(user.id)))
         throw new AppError("Leave your room before deleting your account.");
       await mongoose.connection.transaction(async (session) => {
         await User.deleteOne({ _id: user.id }, { session });
@@ -674,6 +720,14 @@ export function createApplication(
       );
       const users = await User.find({ _id: { $in: ids }, status: "active" });
       const blocks = await Block.find({ userId: id });
+      const present = new Set(
+        (
+          await PlayerPresence.find({
+            _id: { $in: ids },
+            expiresAt: { $gt: new Date() },
+          }).select("_id")
+        ).map((row) => row.id),
+      );
       res.json({
         friends: rows.flatMap((f) => {
           const u = users.find(
@@ -687,9 +741,11 @@ export function createApplication(
                   status: f.status,
                   incoming: f.recipientId === id,
                   user: publicPlayer(u),
-                  online: [...io.sockets.sockets.values()].some(
-                    (s) => s.data.userId === u.id,
-                  ),
+                  online:
+                    present.has(u.id) ||
+                    [...io.sockets.sockets.values()].some(
+                      (s) => s.data.userId === u.id,
+                    ),
                 },
               ]
             : [];
@@ -809,7 +865,11 @@ export function createApplication(
         users: await User.countDocuments(),
         matches: await Match.countDocuments({ status: "completed" }),
         openReports: await Report.countDocuments({ status: "open" }),
-        activeRooms: rooms.rooms.size,
+        activeRooms: durableMode
+          ? await LiveGameRoom.countDocuments({
+              expiresAt: { $gt: new Date() },
+            })
+          : rooms.rooms.size,
       }),
     ),
   );
@@ -955,6 +1015,7 @@ export function createApplication(
     server,
     io,
     rooms,
+    durable,
     close: async () => {
       rooms.close();
       await new Promise<void>((resolve) => io.close(() => resolve()));

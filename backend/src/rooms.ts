@@ -33,14 +33,15 @@ import {
 } from "./games.js";
 export type GameServer = Server<ClientEvents, ServerEvents>;
 type GameSocket = Socket<ClientEvents, ServerEvents>;
-interface Member {
+export interface Member {
   player: Player;
   ready: boolean;
   sockets: Set<string>;
   score: number;
   disconnectedAt?: number;
+  lastSeenAt?: number;
 }
-interface LiveRoom {
+export interface LiveRoom {
   id: string;
   code: string;
   hostId: string;
@@ -90,11 +91,13 @@ export class RoomManager {
       if (this.actions.get(key) === current) this.actions.delete(key);
     }
   }
-  private timer: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setInterval>;
   constructor(
     private io: GameServer,
     private timing = { starting: 2500, results: 3500 },
+    options: { manual?: boolean } = {},
   ) {
+    if (options.manual) return;
     this.timer = setInterval(() => {
       void this.tick();
     }, 100);
@@ -346,7 +349,7 @@ export class RoomManager {
     );
     this.broadcast(r);
   }
-  submit(userId: string, a: Answer) {
+  async submit(userId: string, a: Answer) {
     const r = this.get(userId);
     if (
       r.code !== a.code ||
@@ -361,7 +364,7 @@ export class RoomManager {
     r.answers.set(userId, score);
     r.members.get(userId)!.score += score.points;
     this.broadcast(r);
-    if (r.answers.size === r.members.size) void this.endRound(r);
+    if (r.answers.size === r.members.size) await this.endRound(r);
   }
   private async beginRound(r: LiveRoom) {
     const nextRound = r.round + 1;
@@ -585,7 +588,7 @@ export class RoomManager {
     if (!m.sockets.size) m.disconnectedAt = Date.now();
     this.broadcast(r);
   }
-  private async tick() {
+  async tick() {
     for (const r of this.rooms.values()) {
       if (this.busy.has(r.code)) continue;
       this.busy.add(r.code);

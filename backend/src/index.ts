@@ -2,7 +2,6 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { createApplication } from "./app.js";
 import { ensureConnected } from "./database.js";
-import { seedContent } from "./content.js";
 
 const instance = createApplication({ ensureDatabase: ensureConnected });
 const app = instance.app;
@@ -19,7 +18,6 @@ if (!process.env.VERCEL) {
     )
       throw new Error("Production requires an HTTPS FRONTEND_ORIGIN.");
     await ensureConnected();
-    await seedContent();
     instance.server.listen(port, () =>
       console.log(`DUO CLASH is ready at http://localhost:${port}`),
     );

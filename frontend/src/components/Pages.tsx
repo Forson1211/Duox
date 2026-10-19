@@ -423,7 +423,7 @@ export function CreateRoom() {
                 setSettings({ ...settings, rounds: Number(e.target.value) })
               }
             >
-              {[1, 3, 5, 10, 15, 20].map((n) => (
+              {[1, 3, 4, 5, 10, 15, 20].map((n) => (
                 <option key={n} value={n}>
                   {n} round{n !== 1 ? "s" : ""}
                 </option>
@@ -1064,7 +1064,10 @@ export function SettingsPage() {
         </label>
         <div className="field-label">
           Theme
-          <span className="muted" style={{ display: "block", marginTop: 4, fontWeight: "normal" }}>
+          <span
+            className="muted"
+            style={{ display: "block", marginTop: 4, fontWeight: "normal" }}
+          >
             Automatically syncs with your device’s light/dark mode preference.
           </span>
         </div>

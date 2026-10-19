@@ -222,7 +222,12 @@ export const questions = [
   [
     "Couple Questions",
     "What is generally considered best practice when planning a date night?",
-    ["Cancel last minute without telling", "Try something new together", "Check emails during dinner", "Never ask the other person"],
+    [
+      "Cancel last minute without telling",
+      "Try something new together",
+      "Check emails during dinner",
+      "Never ask the other person",
+    ],
     1,
     "Trying new shared experiences creates bonding and lasting memories.",
   ],
@@ -321,7 +326,7 @@ export async function seedContent() {
       updateOne: {
         filter: { key: `starter-${i + 1}` },
         update: {
-          $set: {
+          $setOnInsert: {
             key: `starter-${i + 1}`,
             category: q[0],
             prompt: q[1],

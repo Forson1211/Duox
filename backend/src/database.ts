@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { allModels } from "./models.js";
+import { seedContent } from "./content.js";
 
 let connectionPromise: Promise<void> | undefined;
 let initialized = false;
@@ -21,6 +22,7 @@ export async function ensureConnected(): Promise<void> {
         },
       );
       await Promise.all(allModels.map((model) => model.init()));
+      await seedContent();
       initialized = true;
     })().finally(() => {
       connectionPromise = undefined;

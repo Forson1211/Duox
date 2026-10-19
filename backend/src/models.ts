@@ -153,7 +153,36 @@ export const Audit = mongoose.model(
     { timestamps: true },
   ),
 );
+// Private, durable live state. Only RoomManager.state() is sent to players.
+const liveRoomSchema = new Schema({
+  _id: String,
+  snapshot: { type: Schema.Types.Mixed, required: true },
+  memberIds: { type: [String], required: true },
+  revision: { type: Number, default: 0 },
+  expiresAt: { type: Date, required: true, expires: 0 },
+});
+liveRoomSchema.index({ memberIds: 1 }, { unique: true });
+export const LiveGameRoom = mongoose.model("LiveGameRoom", liveRoomSchema);
+export const GameLease = mongoose.model(
+  "GameLease",
+  new Schema({
+    _id: String,
+    owner: { type: String, required: true },
+    until: { type: Date, required: true, expires: 0 },
+  }),
+);
+export const PlayerPresence = mongoose.model(
+  "PlayerPresence",
+  new Schema({
+    _id: String,
+    expiresAt: { type: Date, required: true, expires: 0 },
+  }),
+);
+
 export const allModels = [
+  LiveGameRoom,
+  GameLease,
+  PlayerPresence,
   User,
   Session,
   ResetToken,
