@@ -1,5 +1,7 @@
-﻿# Development status
+# Development status
 
-The starter now implements secure accounts, real MongoDB persistence, authoritative multiplayer rooms, all four games, results/Elo, rematches, leaderboards, profiles/settings, daily rewards, achievements, friends, blocking/reporting, and protected administration. Typography uses locally served Bricolage Grotesque.
+The game implements six playable games: Quick Quiz, Memory Rush, Word Blitz, Reflex Race, Number Circuit, and Code Breaker. They share authoritative scoring, private rooms, results, ratings, rematches, achievements, and daily rewards. Accounts, history, rankings, friends, privacy, blocking/reporting, and administration use real MongoDB data. Typography is locally served Bricolage Grotesque.
 
-See README.md and docs/architecture.md, docs/api.md, docs/deployment.md. External release tasks are Atlas/SMTP configuration, HTTPS hosting, backups/retention policy, and production capacity validation. Multi-instance room coordination, tournaments, public matchmaking, guests, and unrestricted messaging are outside this single-instance first release.
+Vercel multiplayer uses durable MongoDB snapshots, leases, revision checks, and authenticated HTTP polling across instances. Persistent Node hosting retains native Socket.IO. See README.md and docs/architecture.md, docs/api.md, docs/deployment.md for behavior, setup, and transport limits; docs/VERIFICATION.md records executed checks.
+
+Production recovery email requires SMTP credentials. Expected concurrency, distributed rate limiting, backup restoration, and retention policies remain operational work. Tournaments, public matchmaking, guest accounts, and unrestricted messaging are outside the implemented release.

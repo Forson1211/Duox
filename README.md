@@ -26,14 +26,16 @@ The defaults work without `.env` files. Copy `backend/.env.example` to `backend/
 ## Implemented
 
 - Registration, login/logout, salted scrypt password hashes, HTTP-only cookie sessions, expiry, and password reset.
-- Private invite codes/links, configurable playlists and rounds, 1–8 players, ready states, host controls, reconnection, host transfer, and rematches.
+- Private invite codes/links and safe room previews, configurable playlists and rounds, 1–8 players, ready states, host controls, reconnection, host transfer, and rematches.
 - **Quick Quiz:** multiple-choice original starter questions across nine categories; first answer only, server scoring, answers revealed after each round.
 - **Memory Rush:** randomly generated growing sequences, timed viewing, ordered input, and server validation.
 - **Word Blitz:** scrambled words and clues, normalized answer checks, bounded speed bonuses.
 - **Reflex Race:** private random signal, false-start penalties, minimum reaction threshold, server-observed timing.
+- **Number Circuit:** generated arithmetic with four choices and increasing difficulty.
+- **Code Breaker:** generated three-digit deduction puzzles with a unique solution, exact/misplaced clues, and at least 30 seconds to solve.
 - Transactional, idempotent results; lifetime points; separate Elo ratings for ranked two-player matches.
 - Global, UTC weekly, quarterly seasonal, and friends leaderboards with pagination.
-- Profiles/privacy, history/recaps, achievements, automatic one-time daily rewards, settings, and theme persistence.
+- Profiles/privacy, history/recaps, achievements, automatic one-time daily rewards, settings, and device-synced light/dark themes.
 - Friend requests, acceptance/decline, presence, removal, reporting, blocking/unblocking.
 - Server-protected admin statistics, question/category editing, activation, report review, suspension/restoration, and audit trail.
 - Responsive desktop/mobile navigation, accessible focus, reduced-motion support, and genuine loading/error/empty states.
@@ -42,7 +44,7 @@ The defaults work without `.env` files. Copy `backend/.env.example` to `backend/
 
 1. Open a normal browser and a private/incognito window; register different accounts.
 2. Player one creates a challenge and shares its code or invite link.
-3. Player two joins. Both click **I’m ready**; the host starts.
+3. Player two joins and clicks **I’m ready**; the automatically ready host starts.
 4. Complete the rounds. Results save automatically and appear in profiles and rankings.
 5. Use **Rematch** or **Return home**. Refresh during a round to check reconnection.
 
@@ -60,9 +62,9 @@ npm.cmd run test:browser
 npm.cmd run test:deployment
 ```
 
-`lint` checks strict TypeScript across workspaces. Tests use isolated MongoDB replica sets, not your Atlas database. Browser checks start their own app on port 5173, use independent Chromium contexts, exercise games/social/admin, check themes/mobile overflow/font loading, and save screenshots under `artifacts/`. Stop an existing frontend before running browser checks. First-run MongoDB/Chromium downloads require network access.
+`lint` checks strict TypeScript across workspaces. Tests use isolated MongoDB replica sets, not your Atlas database. Browser checks build the frontend and start their own app on port 5173, use independent Chromium contexts, exercise games/social/admin, check themes/mobile overflow/font loading, and save screenshots under `artifacts/`. Stop an existing frontend before running browser checks. First-run MongoDB/Chromium downloads require network access.
 
-`test:deployment` checks the compiled production account API and built frontend in Chromium, including cold-start registration, secure cookies, login, logout, and persistence after reload. Vercel setup is documented in [deployment](docs/deployment.md#vercel-account-creation-and-login).
+`test:deployment` runs the compiled production API in three independent processes against an isolated database. Two mobile browser contexts complete a ranked playlist of all six games, refresh mid-match, check saved results/rankings, rematch, and leave. It also checks registration, secure cookies, login, and logout. Vercel setup is documented in [deployment](docs/deployment.md#vercel-account-creation-and-login).
 
 Executed check results are recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
@@ -79,10 +81,12 @@ Register a normal account. Set `ADMIN_BOOTSTRAP_EMAIL` in `backend/.env` to that
 ## Structure
 
 - `frontend/src/components/`: authentication, dashboard, social/admin, lobby, games.
-- `frontend/src/lib/`: credentialed API client, typed socket commands, app context.
+- `frontend/src/lib/`: credentialed API client, adaptive HTTP/Socket.IO connection, app context.
 - `backend/src/app.ts`: REST API, middleware, sockets, static hosting.
 - `backend/src/rooms.ts`: authoritative lifecycle, membership, persistence.
 - `backend/src/games.ts`: challenge creation, safe views, validation, scoring.
+- `backend/src/puzzles.ts`: unique-solution code puzzles and generated arithmetic.
+- `backend/src/durable.ts`: shared room snapshots, presence, leases, revision checks.
 - `backend/src/models.ts`: indexed database models.
 - `backend/scripts/`: local database, seed, admin bootstrap.
 - `shared/src/`: types, schemas, games, achievements, scoring helpers.
@@ -92,4 +96,4 @@ See [architecture](docs/architecture.md), [API](docs/api.md), and [deployment](d
 
 ## Release boundaries
 
-One backend instance owns live rooms in memory. Restarting ends active live rooms; accounts and completed results remain in MongoDB. Multiple instances need shared temporary state and a Socket.IO Redis adapter. Guest accounts, public matchmaking, tournaments, and unrestricted messaging are outside this first release. Reflex scores include network latency. Question/word banks are starter content. Atlas, SMTP, HTTPS hosting, backups, and production load testing need your own service configuration and are not verified by local tests.
+Vercel uses MongoDB-backed live rooms, short-lived leases, revision checks, and authenticated HTTP polling. A match survives function changes and refreshes; scheduled deadlines catch up on the next request. Persistent Node hosting uses Socket.IO and one in-memory coordinator by default. These transports share the same scoring and lifecycle rules. Reflex scores include network latency. SMTP credentials are required for production recovery emails. Guest accounts, public matchmaking, tournaments, and unrestricted messaging remain outside this release. Production load testing and backup restoration are operational checks, separate from the automated game tests.

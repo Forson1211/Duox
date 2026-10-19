@@ -1,5 +1,9 @@
-﻿import type { GameId } from "@duo-clash/shared";
-const files: Record<GameId, string> = {
+import type { GameId } from "@duo-clash/shared";
+import { MindGameArt } from "./MindGameArt";
+const files: Record<
+  Exclude<GameId, "number-circuit" | "code-breaker">,
+  string
+> = {
   "quick-quiz": "quiz",
   "memory-rush": "memory",
   "word-blitz": "word",
@@ -12,6 +16,8 @@ export function GameArt({
   game: GameId | "hero";
   className?: string;
 }) {
+  if (game === "number-circuit" || game === "code-breaker")
+    return <MindGameArt kind={game} className={className} />;
   return (
     <img
       className={`game-art ${className}`}

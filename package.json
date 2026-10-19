@@ -19,7 +19,7 @@
     "admin": "npm run admin -w backend",
     "start": "npm run start -w backend",
     "check": "npm run lint && npm test && npm run build",
-    "test:browser": "tsx scripts/browser-check.ts",
+    "test:browser": "npm run build && tsx scripts/browser-check.ts",
     "test:deployment": "npm run build && tsx scripts/deployment-check.ts"
   },
   "devDependencies": {

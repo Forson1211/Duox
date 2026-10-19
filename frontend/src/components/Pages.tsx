@@ -1,3 +1,4 @@
+import { PlayerStanding, HomeCommunity } from "./Progress";
 import { GameCards } from "./GameCards";
 import { GameArt } from "./GameArt";
 import { Avatar } from "./Avatar";
@@ -19,6 +20,8 @@ import {
   Medal,
   Award,
   Brain,
+  Calculator,
+  KeyRound,
   CalendarDays,
   Check,
   Copy,
@@ -45,7 +48,14 @@ import {
 } from "@duo-clash/shared";
 import { api, post } from "../lib/api";
 import { command, useApp } from "../lib/context";
-const icons = [Brain, Sparkles, Zap, Zap];
+const icons: Record<GameId, typeof Brain> = {
+  "quick-quiz": Brain,
+  "memory-rush": Sparkles,
+  "word-blitz": Zap,
+  "reflex-race": Zap,
+  "number-circuit": Calculator,
+  "code-breaker": KeyRound,
+};
 export function Heading({
   kicker,
   title,
@@ -246,6 +256,7 @@ export function Dashboard() {
           );
         })}
       </div>
+      <PlayerStanding />
       <div className="section-heading compact">
         <div>
           <h2>
@@ -263,6 +274,7 @@ export function Dashboard() {
         <History />
         <DailyChallenge compact />
       </div>
+      <HomeCommunity />
     </div>
   );
 }
@@ -328,7 +340,7 @@ export function PlayPage() {
   );
 }
 export function CreateRoom() {
-  const { socket, setRoom, notify, room } = useApp();
+  const { socket, connected, setRoom, notify, room } = useApp();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const selected = Number(params.get("game"));
@@ -389,8 +401,8 @@ export function CreateRoom() {
         </label>
         <fieldset className="game-picker">
           <legend>Choose your games</legend>
-          {games.map((g, i) => {
-            const Icon = icons[i];
+          {games.map((g) => {
+            const Icon = icons[g.id];
             const checked = settings.gameIds.includes(g.id);
             return (
               <label className={checked ? "selected" : ""} key={g.id}>
@@ -423,7 +435,7 @@ export function CreateRoom() {
                 setSettings({ ...settings, rounds: Number(e.target.value) })
               }
             >
-              {[1, 3, 4, 5, 10, 15, 20].map((n) => (
+              {[1, 3, 4, 5, 6, 10, 15, 20].map((n) => (
                 <option key={n} value={n}>
                   {n} round{n !== 1 ? "s" : ""}
                 </option>
@@ -518,7 +530,7 @@ export function CreateRoom() {
           </p>
         )}
         <button
-          disabled={busy || !settings.gameIds.length || !!room}
+          disabled={busy || !connected || !settings.gameIds.length || !!room}
           className="btn btn-primary btn-large"
         >
           {busy ? "Creating…" : "Create room"}
@@ -529,12 +541,25 @@ export function CreateRoom() {
   );
 }
 export function JoinRoom() {
-  const { socket, setRoom } = useApp();
+  const { socket, connected, setRoom } = useApp();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [code, setCode] = useState(params.get("code") ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const normalized = code.trim().toUpperCase();
+  const preview = useQuery({
+    queryKey: ["room-preview", normalized],
+    queryFn: () =>
+      api<{
+        settings: RoomSettings;
+        status: string;
+        playerCount: number;
+        canJoin: boolean;
+      }>("/rooms/" + normalized + "/preview"),
+    enabled: /^DUO-[A-Z2-9]{6}$/.test(normalized),
+    retry: false,
+  });
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -572,12 +597,52 @@ export function JoinRoom() {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
           />
         </label>
+        {preview.isFetching && (
+          <p className="muted" role="status">
+            Checking your invite...
+          </p>
+        )}
+        {preview.error && (
+          <p className="error-box" role="alert">
+            {preview.error.message}
+          </p>
+        )}
+        {preview.data && (
+          <div className="invite-preview">
+            <strong>{preview.data.settings.name}</strong>
+            <p>
+              {preview.data.playerCount}/{preview.data.settings.maxPlayers}{" "}
+              players · {preview.data.settings.rounds} rounds ·{" "}
+              {preview.data.settings.ranked ? "Ranked" : "Casual"}
+            </p>
+            <p>
+              {preview.data.settings.gameIds
+                .map((id) => games.find((game) => game.id === id)?.title)
+                .join(" · ")}
+            </p>
+            {!preview.data.canJoin && (
+              <p className="muted">
+                {preview.data.status === "waiting"
+                  ? "This room is full."
+                  : "This match has already started."}
+              </p>
+            )}
+          </div>
+        )}
         {error && (
           <p className="error-box" role="alert">
             {error}
           </p>
         )}
-        <button className="btn btn-primary modal-submit" disabled={busy}>
+        <button
+          className="btn btn-primary modal-submit"
+          disabled={
+            busy ||
+            !connected ||
+            preview.isFetching ||
+            preview.data?.canJoin === false
+          }
+        >
           {busy ? "Joining…" : "Join room"}
           <ArrowRight size={17} />
         </button>

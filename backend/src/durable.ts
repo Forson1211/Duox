@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   answerSchema,
@@ -136,6 +136,16 @@ export class DurableRooms {
       expiresAt: { $gt: new Date() },
     }));
   }
+  async preview(userId: string, code: string) {
+    const doc = await LiveGameRoom.findById(code).lean();
+    if (!doc) throw new AppError("Room not found or expired.", 404);
+    const manager = this.manager(doc.snapshot as Snapshot);
+    try {
+      return await manager.preview(userId, code);
+    } finally {
+      manager.close();
+    }
+  }
   private due(snapshot: Snapshot) {
     const now = Date.now();
     return (
@@ -167,7 +177,10 @@ export class DurableRooms {
         const live = manager.rooms.get(code);
         if (live) this.touch(live, userId);
         return {
-          data: result,
+          data:
+            result && typeof result === "object" && "code" in result && live
+              ? manager.state(live)
+              : result,
           room: live && live.members.has(userId) ? manager.state(live) : null,
         };
       } finally {

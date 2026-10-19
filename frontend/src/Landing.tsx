@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Logo } from "./components/Logo";
 import { useQuery } from "@tanstack/react-query";
@@ -271,6 +272,12 @@ export default function Landing({
             <Logo height={28} />
           </a>
           <span>Challenge your people. Claim your crown.</span>
+          <nav className="welcome-footer-links" aria-label="Useful links">
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Fair play</Link>
+            <Link to="/contact">Help & contact</Link>
+            <Link to="/accessibility">Accessibility</Link>
+          </nav>
           <small>© 2026 DUO CLASH</small>
         </footer>
       </main>

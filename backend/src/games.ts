@@ -8,6 +8,7 @@ import {
 import { words } from "./content.js";
 import { Question } from "./models.js";
 import { AppError } from "./auth.js";
+import { makeCodePuzzle, makeNumberPuzzle } from "./puzzles.js";
 export interface SecretRound {
   challenge: Challenge;
   answer: number | string | number[];
@@ -78,6 +79,31 @@ export async function newRound(
     c.letters = letters.join("");
     return { challenge: c, answer: word, explanation: "" };
   }
+  if (gameId === "number-circuit") {
+    const puzzle = makeNumberPuzzle(round);
+    c.prompt = "Find the missing result.";
+    c.expression = puzzle.expression;
+    c.options = puzzle.options;
+    return {
+      challenge: c,
+      answer: puzzle.answer,
+      explanation:
+        "Multiplication and division come before addition and subtraction.",
+    };
+  }
+  if (gameId === "code-breaker") {
+    const puzzle = makeCodePuzzle();
+    c.prompt = "Crack the three-digit code.";
+    c.clues = puzzle.clues;
+    c.codeLength = 3;
+    c.deadline = now + Math.max(30, duration) * 1000;
+    return {
+      challenge: c,
+      answer: puzzle.code,
+      explanation:
+        "Digits never repeat. Each clue counts exact positions and correct digits in other positions.",
+    };
+  }
   c.prompt = "Wait for GO. Do not press early.";
   const signalAt = now + randomInt(2000, 5001);
   c.deadline = signalAt + 5000;
@@ -110,13 +136,21 @@ export function scoreAnswer(
   let elapsed = now - c.startedAt;
   let duration = c.deadline - c.startedAt;
   let detail = "";
-  if (c.gameId === "quick-quiz") {
+  if (c.gameId === "quick-quiz" || c.gameId === "number-circuit") {
     if (typeof value !== "number") throw new AppError("Choose an answer.");
     correct = value === secret.answer;
   }
   if (c.gameId === "word-blitz") {
     if (typeof value !== "string") throw new AppError("Enter a word.");
     correct = value.normalize("NFKC").trim().toUpperCase() === secret.answer;
+  }
+  if (c.gameId === "code-breaker") {
+    if (
+      typeof value !== "string" ||
+      !/^\d{3}$/.test(value.normalize("NFKC").trim())
+    )
+      throw new AppError("Enter exactly three digits.");
+    correct = value.normalize("NFKC").trim() === secret.answer;
   }
   if (c.gameId === "memory-rush") {
     if (now < c.showUntil!)

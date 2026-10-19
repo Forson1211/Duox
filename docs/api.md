@@ -1,4 +1,4 @@
-﻿# API and Socket.IO
+# API and Socket.IO
 
 Base: `/api/v1`. JSON bodies and responses; credentialed cookies. Errors use `{error: string}`. Validation returns 400, invalid sessions 401, forbidden actions 403, unavailable private resources 404, duplicates 409, rate limits 429. Passwords require 10–128 characters; usernames use 3–24 letters/digits/underscores and compare case-insensitively.
 
@@ -49,7 +49,7 @@ Leaderboard responses contain `{leaders,total,page}`, 20 per page. Player record
 | GET    | `/matches/:matchId`         | Participants only                          |
 | GET    | `/matches/:matchId/results` | Completed match/results; participants only |
 
-RoomSettings: `{name,gameIds,rounds,maxPlayers,duration,ranked,category}`. Game IDs: quick-quiz, memory-rush, word-blitz, reflex-race. Rounds 1–20, slots 1–8, answer time 15/30/45 seconds. Ranked requires two slots and two participants. The web client creates/joins through Socket.IO to attach immediately.
+RoomSettings: `{name,gameIds,rounds,maxPlayers,duration,ranked,category}`. Game IDs: quick-quiz, memory-rush, word-blitz, reflex-race, number-circuit, code-breaker. Rounds 1–20, slots 1–8, answer time 15/30/45 seconds. Ranked requires two slots and two participants. The client selects HTTP or Socket.IO from health `transport`, using the same typed commands.
 
 ## Admin
 
@@ -81,6 +81,17 @@ Endpoint `/socket.io`; same authenticated cookie and origin validation. Event ty
 | match:rematch | `{}`                   | undefined; host only after save             |
 | answer:submit | `{code,roundId,value}` | undefined                                   |
 
-Answer values: quiz index 0–3; memory tile-index array; word string; reflex literal `tap`. Clients cannot send scores, keys, ratings, or winner IDs.
+Answer values: quiz/arithmetic choice index 0–3; memory tile-index array; word string; reflex literal `tap`; code string of exactly three digits. Clients cannot send scores, keys, ratings, or winner IDs.
 
 Server `room:state` broadcasts authorized snapshots after state changes, submissions, reconnects, signal/viewing transitions, and completion. State includes public players/presence/readiness/scores, status, round, permitted challenge, submitted IDs, closed-round summaries, clock/deadlines, winners, save state, and rating changes. `room:error` carries a readable error. This consolidated snapshot protocol supports resynchronization without requiring separate events for every visual transition.
+
+## Durable HTTP game transport
+
+These authenticated routes use the same session cookie and command schemas:
+
+- `GET /realtime/state` returns `{room: RoomState | null}` for the requesting player, advances due deadlines, and refreshes presence.
+- `POST /realtime/command` accepts `{event,payload}` using the client-event table above and returns `{data,room}`. Failures use the standard API error status and JSON body.
+- `GET /rooms/:code/preview` returns only `{code,settings,status,playerCount,canJoin}`. It honors blocks and expiry and excludes player identities and challenges.
+- `GET /users/me/stats` returns `{bestScore,rank,winRate}` from persisted results and account counters. Private profiles have a null public rank.
+
+Room snapshots and answers are never returned directly. The current permitted challenge is serialized through the same safe view used by Socket.IO.

@@ -1,4 +1,4 @@
-﻿import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import mongoose from "mongoose";
 import request from "supertest";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
@@ -70,6 +70,7 @@ const settings = (gameId: GameId, maxPlayers = 1) => ({
 beforeAll(async () => {
   mongo = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: "wiredTiger" },
+    instanceOpts: [{ launchTimeout: 60000 }],
   });
   await mongoose.connect(mongo.getUri("duo_durable_tests"));
   await Promise.all(allModels.map((model) => model.init()));
@@ -133,6 +134,8 @@ describe("durable multiplayer across independent API instances", () => {
     "memory-rush",
     "word-blitz",
     "reflex-race",
+    "number-circuit",
+    "code-breaker",
   ] as GameId[]) {
     it(
       "plays " + game + " across instances and saves its result exactly once",
@@ -178,6 +181,12 @@ describe("durable multiplayer across independent API instances", () => {
         expect(answers.filter((answer) => answer.status === 200)).toHaveLength(
           1,
         );
+        // The last answer saves immediately, even if every player closes the tab.
+        const accepted = answers.find((answer) => answer.status === 200)!;
+        expect(accepted.body.room.persisted).toBe(true);
+        expect(
+          await MatchResult.countDocuments({ matchId: accepted.body.room.id }),
+        ).toBe(1);
         const completed = await until(
           player.cookie,
           (room) => room.status === "completed",
@@ -227,5 +236,64 @@ describe("durable multiplayer across independent API instances", () => {
     expect(restored!.code).toBe(created.body.room.code);
     expect(restored!.hostId).toBe(player.id);
     expect((await action(1, player.cookie, "room:leave")).status).toBe(200);
+  });
+  it("catches up missed deadlines without granting another answer window", async () => {
+    const player = await account();
+    const created = await action(0, player.cookie, "room:create", {
+      ...settings("word-blitz"),
+      rounds: 2,
+    });
+    await action(1, player.cookie, "match:start");
+    await LiveGameRoom.updateOne(
+      { _id: created.body.room.code },
+      { $set: { "snapshot.nextAt": Date.now() - 120000 } },
+    );
+    const completed = await sync(2, player.cookie);
+    expect(completed!.status).toBe("completed");
+    expect(completed!.results).toHaveLength(2);
+    expect(
+      completed!.results.every((round) => round.scores[0].points === 0),
+    ).toBe(true);
+    expect(completed!.persisted).toBe(true);
+    expect(await MatchResult.countDocuments({ matchId: completed!.id })).toBe(
+      1,
+    );
+    await action(0, player.cookie, "room:leave");
+  });
+  it("previews permitted room details without exposing players or private challenges", async () => {
+    const host = await account(),
+      guest = await account();
+    const created = await action(
+      0,
+      host.cookie,
+      "room:create",
+      settings("code-breaker", 2),
+    );
+    const path = "/api/v1/rooms/" + created.body.room.code + "/preview";
+    expect((await request(apps[1].app).get(path)).status).toBe(401);
+    const preview = await request(apps[2].app)
+      .get(path)
+      .set("Cookie", guest.cookie);
+    expect(preview.status).toBe(200);
+    expect(preview.body).toMatchObject({
+      playerCount: 1,
+      canJoin: true,
+      settings: { gameIds: ["code-breaker"] },
+    });
+    expect(Object.keys(preview.body).sort()).toEqual([
+      "canJoin",
+      "code",
+      "playerCount",
+      "settings",
+      "status",
+    ]);
+    await request(apps[1].app)
+      .post("/api/v1/blocks")
+      .set("Cookie", host.cookie)
+      .send({ userId: guest.id });
+    expect(
+      (await request(apps[2].app).get(path).set("Cookie", guest.cookie)).status,
+    ).toBe(403);
+    await action(0, host.cookie, "room:leave");
   });
 });

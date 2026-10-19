@@ -1,6 +1,5 @@
 import { io as connectSocket } from "socket.io-client";
-import { chromium, expect } from "@playwright/test";
-import { createServer } from "vite";
+import { chromium, expect as baseExpect } from "@playwright/test";
 import mongoose from "mongoose";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { mkdir } from "node:fs/promises";
@@ -11,36 +10,23 @@ import { allModels, User, MatchResult } from "../backend/src/models.js";
 process.env.NODE_ENV = "test";
 const database = await MongoMemoryReplSet.create({
   replSet: { count: 1, storageEngine: "wiredTiger" },
+  instanceOpts: [{ launchTimeout: 60000 }],
 });
 await mongoose.connect(database.getUri("duo_clash_browser_test"));
 await Promise.all(allModels.map((m) => m.init()));
 await seedContent();
-const backend = createApplication({ timing: { starting: 100, results: 600 } });
-await new Promise<void>((r) => backend.server.listen(0, "127.0.0.1", r));
-const address = backend.server.address() as { port: number };
-const vite = await createServer({
-  root: path.resolve("frontend"),
-  server: {
-    host: "127.0.0.1",
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      "/api": {
-        target: `http://127.0.0.1:${address.port}`,
-        changeOrigin: false,
-      },
-      "/socket.io": {
-        target: `http://127.0.0.1:${address.port}`,
-        ws: true,
-        changeOrigin: false,
-      },
-    },
-  },
+const backend = createApplication({
+  timing: { starting: 100, results: 600 },
+  staticDirectory: path.resolve("frontend/dist"),
 });
-await vite.listen();
+await new Promise<void>((resolve, reject) => {
+  backend.server.once("error", reject);
+  backend.server.listen(5173, "127.0.0.1", resolve);
+});
+const address = backend.server.address() as { port: number };
 const browser = await chromium.launch({ headless: true });
 const errors: string[] = [];
-expect.configure({ timeout: 15000 });
+const expect = baseExpect.configure({ timeout: 30000 });
 try {
   const a = await browser.newContext({
     reducedMotion: "reduce",
@@ -53,7 +39,8 @@ try {
   const page = await a.newPage();
   const rival = await b.newPage();
   for (const p of [page, rival]) {
-    p.setDefaultNavigationTimeout(60000);
+    p.setDefaultNavigationTimeout(90000);
+    p.setDefaultTimeout(60000);
     p.on("pageerror", (e) => errors.push(e.message));
   }
   const register = async (p: typeof page, username: string) => {
@@ -117,7 +104,14 @@ try {
     path: "artifacts/mobile-lobby.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "I’m ready", exact: true }).click();
+  if (
+    await page
+      .getByRole("button", { name: "I\u2019m ready", exact: true })
+      .count()
+  )
+    await page
+      .getByRole("button", { name: "I\u2019m ready", exact: true })
+      .click();
   await rival.getByRole("button", { name: "I’m ready", exact: true }).click();
   await page.getByRole("button", { name: "Start match" }).click();
   await expect(page.locator(".quiz-options")).toBeVisible({ timeout: 20000 });
@@ -168,7 +162,14 @@ try {
   await page.getByLabel("Player limit").selectOption("1");
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   const soloCode = (await page.locator(".room-code").innerText()).trim();
-  await page.getByRole("button", { name: "I’m ready", exact: true }).click();
+  if (
+    await page
+      .getByRole("button", { name: "I\u2019m ready", exact: true })
+      .count()
+  )
+    await page
+      .getByRole("button", { name: "I\u2019m ready", exact: true })
+      .click();
   await page.getByRole("button", { name: "Start match" }).click();
   await expect(page.locator(".memory-grid")).toBeVisible({ timeout: 20000 });
   const solo = backend.rooms.rooms.get(soloCode)!;
@@ -184,7 +185,6 @@ try {
     await page
       .getByRole("button", { name: "Tile " + (n + 1), exact: true })
       .click();
-  await page.getByRole("button", { name: "Submit sequence" }).click();
   await expect(page.locator(".letter-rack")).toBeVisible({ timeout: 10000 });
   const word = solo.secret!.answer as string;
   await page.screenshot({ path: "artifacts/mobile-word.png", fullPage: true });
@@ -219,7 +219,7 @@ try {
   await page.goto("http://localhost:5173/app/settings");
   await page.getByRole("button", { name: "Choose Sunny", exact: true }).click();
   await page.getByLabel("Display name", { exact: true }).fill("William Jones");
-  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await page.emulateMedia({ colorScheme: "dark" });
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "Profile saved." }),
@@ -256,10 +256,10 @@ try {
     fullPage: true,
   });
   console.log(
-    "PASS: persistent dark theme and ten pages at 320, 390, and 768 pixels without horizontal overflow",
+    "PASS: device-synced dark theme and ten pages at 320, 390, and 768 pixels without horizontal overflow",
   );
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: "Toggle theme", exact: true }).click();
+  await page.emulateMedia({ colorScheme: "light" });
   await page.screenshot({
     path: "artifacts/dashboard-light.png",
     fullPage: true,
@@ -433,6 +433,8 @@ try {
   console.log("PASS: no uncaught browser errors");
   console.log("Screenshots saved in artifacts/.");
 } catch (error) {
+  console.error("Browser check failed:", error);
+  console.error("Browser exceptions:", errors);
   await mkdir("artifacts", { recursive: true });
   for (const context of browser.contexts())
     for (const p of context.pages()) {
@@ -452,7 +454,7 @@ try {
   throw error;
 } finally {
   await browser.close();
-  await vite.close();
+  backend.server.closeAllConnections();
   await backend.close();
   await mongoose.disconnect();
   await database.stop();

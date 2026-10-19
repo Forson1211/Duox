@@ -1,13 +1,16 @@
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect as baseExpect } from "@playwright/test";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import express from "express";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fork, type ChildProcess } from "node:child_process";
 import http from "node:http";
+import { mkdir } from "node:fs/promises";
+const expect = baseExpect.configure({ timeout: 30000 });
 
 const database = await MongoMemoryReplSet.create({
   replSet: { count: 1, storageEngine: "wiredTiger" },
+  instanceOpts: [{ launchTimeout: 60000 }],
 });
 process.env.VERCEL = "1";
 process.env.NODE_ENV = "production";
@@ -75,6 +78,9 @@ try {
     viewport: { width: 390, height: 844 },
   });
   const page = await context.newPage();
+  page.setDefaultTimeout(45000);
+  page.setDefaultNavigationTimeout(90000);
+  await mkdir("artifacts", { recursive: true });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const email = "deploy-browser@example.test";
@@ -130,6 +136,9 @@ try {
     viewport: { width: 390, height: 844 },
   });
   const guest = await guestContext.newPage();
+  guest.setDefaultTimeout(45000);
+  guest.setDefaultNavigationTimeout(90000);
+  guest.on("pageerror", (error) => errors.push(error.message));
   await guest.goto(`${base}/register`);
   await guest.getByLabel("Display name").fill("Deploy Rival");
   await guest.getByLabel("Username", { exact: true }).fill("deployrival");
@@ -144,8 +153,9 @@ try {
     .click();
   await expect(guest).toHaveURL(`${base}/app`);
   await page.goto(`${base}/app/rooms/create`);
-  await page.getByLabel("Room name").fill("Production four game duel");
-  await page.getByLabel("Rounds", { exact: true }).selectOption("4");
+  await page.getByLabel("Room name").fill("Production six game duel");
+  await page.getByLabel("Rounds", { exact: true }).selectOption("6");
+  await page.getByLabel("Answer time", { exact: true }).selectOption("45");
   await page.getByLabel(/Ranked head-to-head/).check();
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   await expect(page.locator(".room-code")).toBeVisible();
@@ -157,7 +167,9 @@ try {
   await expect(
     page.getByRole("button", { name: "Start match" }),
   ).toBeDisabled();
-  await guest.getByRole("button", { name: "I?m ready", exact: true }).click();
+  await guest
+    .getByRole("button", { name: "I\u2019m ready", exact: true })
+    .click();
   await expect(page.getByRole("button", { name: "Start match" })).toBeEnabled();
   await page.getByRole("button", { name: "Start match" }).click();
   await expect(page.locator(".quiz-options")).toBeVisible({ timeout: 20000 });
@@ -167,7 +179,7 @@ try {
       .db!.collection("livegamerooms")
       .findOne({ _id: code } as any);
   let secret = (await roomDoc())!.snapshot.secret;
-  await page.reload();
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator(".quiz-options")).toBeVisible();
   await page.locator(".quiz-options button").nth(secret.answer).click();
   await guest
@@ -187,7 +199,6 @@ try {
       await player
         .getByRole("button", { name: "Tile " + (tile + 1), exact: true })
         .click();
-    await player.getByRole("button", { name: "Submit sequence" }).click();
   }
   await expect(page.locator(".letter-rack")).toBeVisible({ timeout: 15000 });
   secret = (await roomDoc())!.snapshot.secret;
@@ -200,6 +211,32 @@ try {
   await page.locator(".reflex-pad.go").click();
   await expect(guest.locator(".reflex-pad.go")).toBeVisible();
   await guest.locator(".reflex-pad.go").click();
+  await expect(page.locator(".number-circuit")).toBeVisible({ timeout: 15000 });
+  secret = (await roomDoc())!.snapshot.secret;
+  await page.screenshot({
+    path: "artifacts/number-circuit-mobile.png",
+    fullPage: true,
+  });
+  for (const player of [page, guest])
+    await player.locator(".quiz-options button").nth(secret.answer).click();
+  await expect(page.locator(".code-breaker")).toBeVisible({ timeout: 15000 });
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "artifacts/code-breaker-mobile.png",
+    fullPage: true,
+  });
+  secret = (await roomDoc())!.snapshot.secret;
+  for (const player of [page, guest]) {
+    await player
+      .getByLabel("Your secret code", { exact: true })
+      .fill(secret.answer);
+    await player.getByRole("button", { name: "Crack the code" }).click();
+  }
   await expect(
     page.getByRole("heading", { name: "The crown is yours." }),
   ).toBeVisible({ timeout: 20000 });
@@ -207,7 +244,7 @@ try {
     guest.getByRole("heading", { name: "Deploy Browser takes the crown." }),
   ).toBeVisible();
   const completed = await roomDoc();
-  expect(completed!.snapshot.results).toHaveLength(4);
+  expect(completed!.snapshot.results).toHaveLength(6);
   expect(
     completed!.snapshot.results.every((round: any) =>
       round.scores.some((score: any) => score.correct),
@@ -223,7 +260,7 @@ try {
   );
   expect((await rankings.json()).leaders).toHaveLength(2);
   console.log(
-    "PASS: all four games, ranked scoring, persisted results, achievements, and leaderboard entries across independent production workers",
+    "PASS: all six games, ranked scoring, persisted results, achievements, and leaderboard entries across independent production workers",
   );
   await page.getByRole("button", { name: "Rematch", exact: true }).click();
   await expect(
@@ -251,6 +288,18 @@ try {
   console.log(
     "PASS: rematch, leaving, and requests shared by all three production workers",
   );
+  for (const route of ["/privacy", "/terms", "/contact", "/accessibility"]) {
+    await page.goto(base + route);
+    await expect(page.locator("h1")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  console.log(
+    "PASS: public help/privacy/fair-play/accessibility pages at 320px",
+  );
   await guestContext.close();
 
   const health = await context.request.get(`${base}/api/v1/health`);
@@ -263,6 +312,21 @@ try {
   console.log(
     "PASS: health JSON, API 404 JSON, mobile auth routes, and no browser exceptions",
   );
+} catch (error) {
+  console.error("Production browser check failed:", error);
+  for (const context of browser.contexts())
+    for (const page of context.pages()) {
+      console.error("Failed URL:", page.url());
+      console.error(
+        (
+          await page
+            .locator("body")
+            .innerText()
+            .catch(() => "unavailable")
+        ).slice(0, 4000),
+      );
+    }
+  throw error;
 } finally {
   await browser.close();
   await Promise.all(

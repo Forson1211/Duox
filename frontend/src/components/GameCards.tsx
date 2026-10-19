@@ -1,4 +1,4 @@
-﻿import { ArrowUpRight, Clock3, Users, SearchX } from "lucide-react";
+import { ArrowUpRight, Clock3, Users, SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
 import { games } from "@duo-clash/shared";
 import { GameArt } from "./GameArt";
@@ -21,7 +21,7 @@ export function GameCards({
       <div className="empty-state">
         <SearchX size={32} />
         <h3>No games found</h3>
-        <p>Try “quiz”, “memory”, “word”, or “reflex”.</p>
+        <p>Try quiz, memory, word, reflex, maths, or logic.</p>
       </div>
     );
   return (
@@ -31,7 +31,12 @@ export function GameCards({
           <div className="game-cover">
             <span className="cover-tag">
               <Clock3 size={12} />
-              {game.id === "reflex-race" ? "~10 sec" : "15 sec"} / round
+              {game.id === "reflex-race"
+                ? "~10 sec"
+                : game.id === "code-breaker"
+                  ? "30 sec"
+                  : "15 sec"}{" "}
+              / round
             </span>
             <GameArt game={game.id} />
           </div>

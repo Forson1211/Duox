@@ -67,7 +67,7 @@ export function dailyInfo(now = new Date()) {
   return {
     id: day,
     day,
-    gameId: gameIds[Math.floor(Date.parse(day) / 86400000) % 4],
+    gameId: gameIds[Math.floor(Date.parse(day) / 86400000) % gameIds.length],
     reward: 200,
     description:
       "Complete a match and score at least 100 points in today’s game. Reward is granted automatically once per UTC day.",
@@ -153,6 +153,31 @@ export class RoomManager {
     if (!r || !r.members.has(userId))
       throw new AppError("You are not in a room.", 404);
     return r;
+  }
+  async preview(userId: string, code: string) {
+    const room = this.rooms.get(code);
+    if (!room || room.expiresAt < Date.now())
+      throw new AppError("Room not found or expired.", 404);
+    const ids = [...room.members.keys()];
+    if (
+      await Block.exists({
+        $or: [
+          { userId, targetId: { $in: ids } },
+          { userId: { $in: ids }, targetId: userId },
+        ],
+      })
+    )
+      throw new AppError("You cannot join this room.", 403);
+    return {
+      code,
+      settings: room.settings,
+      status: room.status,
+      playerCount: room.members.size,
+      canJoin:
+        room.members.has(userId) ||
+        (room.status === "waiting" &&
+          room.members.size < room.settings.maxPlayers),
+    };
   }
   async create(userId: string, settings: RoomSettings, socket?: GameSocket) {
     return this.exclusive(userId, () =>
@@ -366,7 +391,7 @@ export class RoomManager {
     this.broadcast(r);
     if (r.answers.size === r.members.size) await this.endRound(r);
   }
-  private async beginRound(r: LiveRoom) {
+  private async beginRound(r: LiveRoom, startedAt = Date.now()) {
     const nextRound = r.round + 1;
     const game =
       r.settings.gameIds[(nextRound - 1) % r.settings.gameIds.length];
@@ -375,14 +400,9 @@ export class RoomManager {
       nextRound,
       r.settings.duration,
       r.settings.category,
-      Date.now(),
+      startedAt,
       r.usedQuizPrompts ?? [],
     );
-    const shift = Date.now() - secret.challenge.startedAt;
-    secret.challenge.startedAt += shift;
-    secret.challenge.deadline += shift;
-    if (secret.challenge.showUntil) secret.challenge.showUntil += shift;
-    if (secret.signalAt) secret.signalAt += shift;
     r.round = nextRound;
     r.secret = secret;
     if (game === "quick-quiz") {
@@ -396,7 +416,7 @@ export class RoomManager {
     r.memoryHidden = false;
     this.broadcast(r);
   }
-  private async endRound(r: LiveRoom) {
+  private async endRound(r: LiveRoom, endedAt = Date.now()) {
     if (r.status !== "playing" || !r.secret) return;
     r.status = "round-results";
     r.results.push({
@@ -412,7 +432,8 @@ export class RoomManager {
         }),
       })),
     });
-    r.nextAt = Date.now() + this.timing.results;
+    r.nextAt = endedAt + this.timing.results;
+    if (r.round >= r.settings.rounds) await this.persist(r);
     this.broadcast(r);
   }
   async persist(r: LiveRoom) {
@@ -615,31 +636,42 @@ export class RoomManager {
             )
               await this.leave(id);
         }
-        if (r.status === "starting" && now >= r.nextAt!)
-          await this.beginRound(r);
-        if (r.status === "playing" && r.secret) {
-          if (!r.signalSent && r.secret.signalAt && now >= r.secret.signalAt) {
-            r.signalSent = true;
-            this.broadcast(r);
+        // Advance from scheduled times so a cold instance catches up missed
+        // deadlines instead of extending a round or restarting its answer window.
+        for (let step = 0; step < r.settings.rounds * 2 + 4; step++) {
+          const before = `${r.status}:${r.round}:${r.nextAt}`;
+          if (r.status === "starting" && now >= r.nextAt!)
+            await this.beginRound(r, r.nextAt);
+          if (r.status === "playing" && r.secret) {
+            if (
+              !r.signalSent &&
+              r.secret.signalAt &&
+              now >= r.secret.signalAt
+            ) {
+              r.signalSent = true;
+              this.broadcast(r);
+            }
+            if (
+              !r.memoryHidden &&
+              r.secret.challenge.showUntil &&
+              now >= r.secret.challenge.showUntil
+            ) {
+              r.memoryHidden = true;
+              this.broadcast(r);
+            }
+            if (now >= r.secret.challenge.deadline)
+              await this.endRound(r, r.secret.challenge.deadline);
           }
-          if (
-            !r.memoryHidden &&
-            r.secret.challenge.showUntil &&
-            now >= r.secret.challenge.showUntil
-          ) {
-            r.memoryHidden = true;
-            this.broadcast(r);
+          if (r.status === "round-results" && now >= r.nextAt!) {
+            if (r.round < r.settings.rounds) await this.beginRound(r, r.nextAt);
+            else {
+              await this.persist(r);
+              r.status = "completed";
+              r.nextAt = undefined;
+              this.broadcast(r);
+            }
           }
-          if (now >= r.secret.challenge.deadline) await this.endRound(r);
-        }
-        if (r.status === "round-results" && now >= r.nextAt!) {
-          if (r.round < r.settings.rounds) await this.beginRound(r);
-          else {
-            await this.persist(r);
-            r.status = "completed";
-            r.nextAt = undefined;
-            this.broadcast(r);
-          }
+          if (before === `${r.status}:${r.round}:${r.nextAt}`) break;
         }
       } catch (e) {
         console.error(

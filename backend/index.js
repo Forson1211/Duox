@@ -109228,12 +109228,12 @@ function _handleAddress(tokens, from, to) {
   }
   data.address = addressParts;
   if (!data.address.length && data.text.length && !textFromComment) {
-    const candidates = data.text.map((part) => _collapseAtSpacing(part));
+    const candidates2 = data.text.map((part) => _collapseAtSpacing(part));
     for (let i = 0; i < data.text.length; i++) {
       const local = data.quotedLocalAt[i];
       const quotedLocal = data.textWasQuoted[i] && local >= 0 && QUOTED_LOCAL_DOMAIN.test(data.text[i].slice(local)) ? _quoteLocalPart(data.text[i]) : "";
-      if (quotedLocal || !data.textWasQuoted[i] && _isAddrSpec(candidates[i])) {
-        data.address = [quotedLocal || candidates[i]];
+      if (quotedLocal || !data.textWasQuoted[i] && _isAddrSpec(candidates2[i])) {
+        data.address = [quotedLocal || candidates2[i]];
         data.text.splice(i, 1);
         data.textWasQuoted.splice(i, 1);
         data.quotedLocalAt.splice(i, 1);
@@ -109244,7 +109244,7 @@ function _handleAddress(tokens, from, to) {
       let extracted = false;
       for (let i = 0; i < data.text.length; i++) {
         if (!data.textWasQuoted[i]) {
-          const part = candidates[i];
+          const part = candidates2[i];
           let remainder = data.text[i];
           const at = _looseAddressStart(part);
           if (at >= 0) {
@@ -121339,7 +121339,9 @@ var gameIds = [
   "quick-quiz",
   "memory-rush",
   "word-blitz",
-  "reflex-race"
+  "reflex-race",
+  "number-circuit",
+  "code-breaker"
 ];
 var games = [
   {
@@ -121369,6 +121371,20 @@ var games = [
     category: "REACTION",
     description: "Wait for GO. Then make your move.",
     tone: "blue"
+  },
+  {
+    id: "number-circuit",
+    title: "Number Circuit",
+    category: "MENTAL MATH",
+    description: "Connect the numbers. Beat the clock. Keep your mind sharp.",
+    tone: "blue"
+  },
+  {
+    id: "code-breaker",
+    title: "Code Breaker",
+    category: "LOGIC",
+    description: "A secret code. A handful of clues. One clever deduction.",
+    tone: "orange"
   }
 ];
 var usernameSchema = external_exports.string().trim().min(3).max(24).regex(/^[a-zA-Z0-9_]+$/, "Use letters, numbers, and underscores.");
@@ -121384,7 +121400,7 @@ var loginSchema = external_exports.object({
 });
 var roomSchema = external_exports.object({
   name: external_exports.string().trim().min(1).max(48).default("Friendly rivalry"),
-  gameIds: external_exports.array(external_exports.enum(gameIds)).min(1).max(4).default([...gameIds]),
+  gameIds: external_exports.array(external_exports.enum(gameIds)).min(1).max(gameIds.length).default([...gameIds]),
   rounds: external_exports.number().int().min(1).max(20).default(10),
   maxPlayers: external_exports.number().int().min(1).max(8).default(2),
   duration: external_exports.union([external_exports.literal(15), external_exports.literal(30), external_exports.literal(45)]).default(15),
@@ -121776,10 +121792,10 @@ function requireAdmin(req, _res, next) {
 
 // src/rooms.ts
 var import_mongoose2 = __toESM(require_mongoose2(), 1);
-import { randomInt as randomInt2, randomUUID as randomUUID2 } from "node:crypto";
+import { randomInt as randomInt3, randomUUID as randomUUID2 } from "node:crypto";
 
 // src/games.ts
-import { randomInt, randomUUID } from "node:crypto";
+import { randomInt as randomInt2, randomUUID } from "node:crypto";
 
 // src/content.ts
 var questions = [
@@ -122124,6 +122140,99 @@ async function seedContent() {
   );
 }
 
+// src/puzzles.ts
+import { randomInt } from "node:crypto";
+var candidates = Array.from(
+  { length: 1e3 },
+  (_, n) => String(n).padStart(3, "0")
+).filter((code) => new Set(code).size === 3);
+function evaluateCode(code, guess) {
+  const placed = [...guess].filter(
+    (digit, index) => code[index] === digit
+  ).length;
+  const shared = [...guess].filter((digit) => code.includes(digit)).length;
+  return { placed, misplaced: shared - placed };
+}
+function solveCode(clues) {
+  return candidates.filter(
+    (code) => clues.every((clue) => {
+      const result = evaluateCode(code, clue.guess);
+      return result.placed === clue.placed && result.misplaced === clue.misplaced;
+    })
+  );
+}
+function makeCodePuzzle() {
+  const code = candidates[randomInt(candidates.length)];
+  const clues = [];
+  let possible = [...candidates];
+  while (possible.length > 1 || clues.length < 3) {
+    let best;
+    let bestRemaining = Infinity;
+    for (let i = 0; i < 70; i++) {
+      const guess = candidates[randomInt(candidates.length)];
+      if (guess === code || clues.some((clue) => clue.guess === guess))
+        continue;
+      const result = evaluateCode(code, guess);
+      const remaining = possible.filter((candidate) => {
+        const check = evaluateCode(candidate, guess);
+        return check.placed === result.placed && check.misplaced === result.misplaced;
+      }).length;
+      if (remaining < bestRemaining) {
+        best = { guess, ...result };
+        bestRemaining = remaining;
+      }
+    }
+    if (!best) continue;
+    clues.push(best);
+    possible = solveCode(clues);
+    if (clues.length >= 7 && possible.length > 1) {
+      const other = possible.find((candidate) => candidate !== code);
+      const clue = { guess: other, ...evaluateCode(code, other) };
+      clues.push(clue);
+      possible = solveCode(clues);
+    }
+  }
+  return { code, clues };
+}
+function makeNumberPuzzle(round) {
+  const a = randomInt(2, 13), b = randomInt(2, 13), c = randomInt(2, 10);
+  const kind = round >= 5 ? randomInt(5) : randomInt(4);
+  let expression, answer;
+  switch (kind) {
+    case 0:
+      expression = `${a * 2} + ${b}`;
+      answer = a * 2 + b;
+      break;
+    case 1:
+      expression = `${a + b} \u2212 ${b}`;
+      answer = a;
+      break;
+    case 2:
+      expression = `${a} \xD7 ${b}`;
+      answer = a * b;
+      break;
+    case 3:
+      expression = `${a * b} \xF7 ${a}`;
+      answer = b;
+      break;
+    default:
+      expression = `${a} \xD7 ${b} + ${c}`;
+      answer = a * b + c;
+  }
+  const choices = /* @__PURE__ */ new Set([answer]);
+  while (choices.size < 4) choices.add(answer + randomInt(-9, 10));
+  const options = [...choices];
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  return {
+    expression,
+    options: options.map(String),
+    answer: options.indexOf(answer)
+  };
+}
+
 // src/games.ts
 async function newRound(gameId, round, duration, category, now = Date.now(), usedPrompts = []) {
   const c = {
@@ -122144,7 +122253,7 @@ async function newRound(gameId, round, duration, category, now = Date.now(), use
       );
     const unused = list.filter((q2) => !usedPrompts.includes(q2.prompt));
     const pool = unused.length ? unused : list;
-    const q = pool[randomInt(pool.length)];
+    const q = pool[randomInt2(pool.length)];
     c.prompt = q.prompt;
     c.options = [...q.options];
     return { challenge: c, answer: q.answer, explanation: q.explanation ?? "" };
@@ -122152,7 +122261,7 @@ async function newRound(gameId, round, duration, category, now = Date.now(), use
   if (gameId === "memory-rush") {
     const sequence = Array.from(
       { length: Math.min(3 + Math.floor((round - 1) / 2), 9) },
-      () => randomInt(4)
+      () => randomInt2(4)
     );
     c.prompt = "Remember the tile sequence";
     c.sequence = sequence;
@@ -122166,10 +122275,10 @@ async function newRound(gameId, round, duration, category, now = Date.now(), use
     };
   }
   if (gameId === "word-blitz") {
-    const [word, clue] = words[randomInt(words.length)];
+    const [word, clue] = words[randomInt2(words.length)];
     let letters = [...word];
     for (let i = letters.length - 1; i > 0; i--) {
-      const j = randomInt(i + 1);
+      const j = randomInt2(i + 1);
       [letters[i], letters[j]] = [letters[j], letters[i]];
     }
     if (letters.join("") === word) letters = [...word.slice(1), word[0]];
@@ -122177,8 +122286,31 @@ async function newRound(gameId, round, duration, category, now = Date.now(), use
     c.letters = letters.join("");
     return { challenge: c, answer: word, explanation: "" };
   }
+  if (gameId === "number-circuit") {
+    const puzzle = makeNumberPuzzle(round);
+    c.prompt = "Find the missing result.";
+    c.expression = puzzle.expression;
+    c.options = puzzle.options;
+    return {
+      challenge: c,
+      answer: puzzle.answer,
+      explanation: "Multiplication and division come before addition and subtraction."
+    };
+  }
+  if (gameId === "code-breaker") {
+    const puzzle = makeCodePuzzle();
+    c.prompt = "Crack the three-digit code.";
+    c.clues = puzzle.clues;
+    c.codeLength = 3;
+    c.deadline = now + Math.max(30, duration) * 1e3;
+    return {
+      challenge: c,
+      answer: puzzle.code,
+      explanation: "Digits never repeat. Each clue counts exact positions and correct digits in other positions."
+    };
+  }
   c.prompt = "Wait for GO. Do not press early.";
-  const signalAt = now + randomInt(2e3, 5001);
+  const signalAt = now + randomInt2(2e3, 5001);
   c.deadline = signalAt + 5e3;
   return {
     challenge: c,
@@ -122201,13 +122333,18 @@ function scoreAnswer(secret, value, now = Date.now()) {
   let elapsed = now - c.startedAt;
   let duration = c.deadline - c.startedAt;
   let detail = "";
-  if (c.gameId === "quick-quiz") {
+  if (c.gameId === "quick-quiz" || c.gameId === "number-circuit") {
     if (typeof value !== "number") throw new AppError("Choose an answer.");
     correct = value === secret.answer;
   }
   if (c.gameId === "word-blitz") {
     if (typeof value !== "string") throw new AppError("Enter a word.");
     correct = value.normalize("NFKC").trim().toUpperCase() === secret.answer;
+  }
+  if (c.gameId === "code-breaker") {
+    if (typeof value !== "string" || !/^\d{3}$/.test(value.normalize("NFKC").trim()))
+      throw new AppError("Enter exactly three digits.");
+    correct = value.normalize("NFKC").trim() === secret.answer;
   }
   if (c.gameId === "memory-rush") {
     if (now < c.showUntil)
@@ -122247,7 +122384,7 @@ function dailyInfo(now = /* @__PURE__ */ new Date()) {
   return {
     id: day,
     day,
-    gameId: gameIds[Math.floor(Date.parse(day) / 864e5) % 4],
+    gameId: gameIds[Math.floor(Date.parse(day) / 864e5) % gameIds.length],
     reward: 200,
     description: "Complete a match and score at least 100 points in today\u2019s game. Reward is granted automatically once per UTC day."
   };
@@ -122321,6 +122458,26 @@ var RoomManager = class {
       throw new AppError("You are not in a room.", 404);
     return r;
   }
+  async preview(userId, code) {
+    const room = this.rooms.get(code);
+    if (!room || room.expiresAt < Date.now())
+      throw new AppError("Room not found or expired.", 404);
+    const ids = [...room.members.keys()];
+    if (await Block.exists({
+      $or: [
+        { userId, targetId: { $in: ids } },
+        { userId: { $in: ids }, targetId: userId }
+      ]
+    }))
+      throw new AppError("You cannot join this room.", 403);
+    return {
+      code,
+      settings: room.settings,
+      status: room.status,
+      playerCount: room.members.size,
+      canJoin: room.members.has(userId) || room.status === "waiting" && room.members.size < room.settings.maxPlayers
+    };
+  }
   async create(userId, settings, socket) {
     return this.exclusive(
       userId,
@@ -122337,7 +122494,7 @@ var RoomManager = class {
     for (let attempt = 0; attempt < 8; attempt++) {
       code = "DUO-" + Array.from(
         { length: 6 },
-        () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[randomInt2(32)]
+        () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[randomInt3(32)]
       ).join("");
       id = randomUUID2();
       try {
@@ -122513,7 +122670,7 @@ var RoomManager = class {
     this.broadcast(r);
     if (r.answers.size === r.members.size) await this.endRound(r);
   }
-  async beginRound(r) {
+  async beginRound(r, startedAt = Date.now()) {
     const nextRound = r.round + 1;
     const game = r.settings.gameIds[(nextRound - 1) % r.settings.gameIds.length];
     const secret = await newRound(
@@ -122521,14 +122678,9 @@ var RoomManager = class {
       nextRound,
       r.settings.duration,
       r.settings.category,
-      Date.now(),
+      startedAt,
       r.usedQuizPrompts ?? []
     );
-    const shift = Date.now() - secret.challenge.startedAt;
-    secret.challenge.startedAt += shift;
-    secret.challenge.deadline += shift;
-    if (secret.challenge.showUntil) secret.challenge.showUntil += shift;
-    if (secret.signalAt) secret.signalAt += shift;
     r.round = nextRound;
     r.secret = secret;
     if (game === "quick-quiz") {
@@ -122542,7 +122694,7 @@ var RoomManager = class {
     r.memoryHidden = false;
     this.broadcast(r);
   }
-  async endRound(r) {
+  async endRound(r, endedAt = Date.now()) {
     if (r.status !== "playing" || !r.secret) return;
     r.status = "round-results";
     r.results.push({
@@ -122558,7 +122710,8 @@ var RoomManager = class {
         }
       }))
     });
-    r.nextAt = Date.now() + this.timing.results;
+    r.nextAt = endedAt + this.timing.results;
+    if (r.round >= r.settings.rounds) await this.persist(r);
     this.broadcast(r);
   }
   async persist(r) {
@@ -122748,27 +122901,32 @@ var RoomManager = class {
             if (!m.sockets.size && m.disconnectedAt && now - m.disconnectedAt > 3e4)
               await this.leave(id);
         }
-        if (r.status === "starting" && now >= r.nextAt)
-          await this.beginRound(r);
-        if (r.status === "playing" && r.secret) {
-          if (!r.signalSent && r.secret.signalAt && now >= r.secret.signalAt) {
-            r.signalSent = true;
-            this.broadcast(r);
+        for (let step = 0; step < r.settings.rounds * 2 + 4; step++) {
+          const before = `${r.status}:${r.round}:${r.nextAt}`;
+          if (r.status === "starting" && now >= r.nextAt)
+            await this.beginRound(r, r.nextAt);
+          if (r.status === "playing" && r.secret) {
+            if (!r.signalSent && r.secret.signalAt && now >= r.secret.signalAt) {
+              r.signalSent = true;
+              this.broadcast(r);
+            }
+            if (!r.memoryHidden && r.secret.challenge.showUntil && now >= r.secret.challenge.showUntil) {
+              r.memoryHidden = true;
+              this.broadcast(r);
+            }
+            if (now >= r.secret.challenge.deadline)
+              await this.endRound(r, r.secret.challenge.deadline);
           }
-          if (!r.memoryHidden && r.secret.challenge.showUntil && now >= r.secret.challenge.showUntil) {
-            r.memoryHidden = true;
-            this.broadcast(r);
+          if (r.status === "round-results" && now >= r.nextAt) {
+            if (r.round < r.settings.rounds) await this.beginRound(r, r.nextAt);
+            else {
+              await this.persist(r);
+              r.status = "completed";
+              r.nextAt = void 0;
+              this.broadcast(r);
+            }
           }
-          if (now >= r.secret.challenge.deadline) await this.endRound(r);
-        }
-        if (r.status === "round-results" && now >= r.nextAt) {
-          if (r.round < r.settings.rounds) await this.beginRound(r);
-          else {
-            await this.persist(r);
-            r.status = "completed";
-            r.nextAt = void 0;
-            this.broadcast(r);
-          }
+          if (before === `${r.status}:${r.round}:${r.nextAt}`) break;
         }
       } catch (e) {
         console.error(
@@ -122966,6 +123124,16 @@ var DurableRooms = class {
       expiresAt: { $gt: /* @__PURE__ */ new Date() }
     });
   }
+  async preview(userId, code) {
+    const doc = await LiveGameRoom.findById(code).lean();
+    if (!doc) throw new AppError("Room not found or expired.", 404);
+    const manager = this.manager(doc.snapshot);
+    try {
+      return await manager.preview(userId, code);
+    } finally {
+      manager.close();
+    }
+  }
   due(snapshot) {
     const now = Date.now();
     return snapshot.expiresAt <= now || (snapshot.status === "starting" || snapshot.status === "round-results") && (snapshot.nextAt ?? Infinity) <= now || snapshot.status === "playing" && (snapshot.secret?.challenge.deadline ?? Infinity) <= now || snapshot.status === "waiting" && snapshot.members.some(([, m]) => now - (m.lastSeenAt ?? 0) > 3e4);
@@ -122984,7 +123152,7 @@ var DurableRooms = class {
         const live = manager.rooms.get(code);
         if (live) this.touch(live, userId);
         return {
-          data: result,
+          data: result && typeof result === "object" && "code" in result && live ? manager.state(live) : result,
           room: live && live.members.has(userId) ? manager.state(live) : null
         };
       } finally {
@@ -123540,6 +123708,38 @@ If you did not request this, ignore this email.`
     })
   );
   api.get("/users/me", (req, res) => res.json({ user: account(req.user) }));
+  api.get(
+    "/rooms/:code/preview",
+    wrap2(async (req, res) => {
+      const code = external_exports.string().trim().toUpperCase().regex(/^DUO-[A-Z2-9]{6}$/).parse(req.params.code);
+      res.json(
+        await (durableMode ? durable : rooms).preview(req.user.id, code)
+      );
+    })
+  );
+  api.get(
+    "/users/me/stats",
+    wrap2(async (req, res) => {
+      const user = req.user;
+      const [result] = await MatchResult.aggregate([
+        { $match: { userId: user.id } },
+        { $group: { _id: null, bestScore: { $max: "$score" } } }
+      ]);
+      const rank = user.visibility === "public" ? 1 + await User.countDocuments({
+        status: "active",
+        visibility: "public",
+        $or: [
+          { points: { $gt: user.points } },
+          { points: user.points, _id: { $gt: user._id } }
+        ]
+      }) : null;
+      res.json({
+        bestScore: result?.bestScore ?? 0,
+        rank,
+        winRate: user.matches ? Math.round(user.wins / user.matches * 100) : 0
+      });
+    })
+  );
   api.patch(
     "/users/me",
     wrap2(async (req, res) => {
@@ -123567,6 +123767,7 @@ If you did not request this, ignore this email.`
       await import_mongoose3.default.connection.transaction(async (session) => {
         await User.deleteOne({ _id: user.id }, { session });
         await Session.deleteMany({ userId: user.id }, { session });
+        await PlayerPresence.deleteOne({ _id: user.id }, { session });
         await ResetToken.deleteMany({ userId: user.id }, { session });
         await Friendship.deleteMany(
           { $or: [{ requesterId: user.id }, { recipientId: user.id }] },
@@ -123611,7 +123812,11 @@ If you did not request this, ignore this email.`
     "/matches",
     wrap2(
       async (req, res) => res.status(201).json({
-        room: await rooms.create(req.user.id, roomSchema.parse(req.body))
+        room: durableMode ? (await durable.execute(
+          req.user.id,
+          "room:create",
+          roomSchema.parse(req.body)
+        )).room : await rooms.create(req.user.id, roomSchema.parse(req.body))
       })
     )
   );
@@ -123619,7 +123824,9 @@ If you did not request this, ignore this email.`
     "/matches/join",
     wrap2(async (req, res) => {
       const { code } = external_exports.object({ code: external_exports.string().trim().toUpperCase().max(12) }).parse(req.body);
-      res.json({ room: await rooms.join(req.user.id, code) });
+      res.json({
+        room: durableMode ? (await durable.execute(req.user.id, "room:join", { code })).room : await rooms.join(req.user.id, code)
+      });
     })
   );
   api.get(

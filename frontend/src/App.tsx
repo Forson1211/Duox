@@ -1,3 +1,4 @@
+import { PublicInfo } from "./components/PublicInfo";
 import { Avatar } from "./components/Avatar";
 import { Logo } from "./components/Logo";
 import { useEffect, useState, useCallback } from "react";
@@ -205,6 +206,7 @@ export default function App() {
     await Promise.all([
       query.invalidateQueries({ queryKey: ["me"] }),
       query.invalidateQueries({ queryKey: ["history"] }),
+      query.invalidateQueries({ queryKey: ["stats"] }),
       query.invalidateQueries({ queryKey: ["leaders"] }),
       query.invalidateQueries({ queryKey: ["daily"] }),
     ]);
@@ -295,6 +297,14 @@ export default function App() {
       setToast((e as Error).message);
     }
   };
+  const infoPage = location.pathname.slice(1);
+  if (["privacy", "terms", "contact", "accessibility"].includes(infoPage))
+    return (
+      <PublicInfo
+        page={infoPage as "privacy" | "terms" | "contact" | "accessibility"}
+        dark={dark}
+      />
+    );
   if (location.pathname === "/")
     return (
       <>

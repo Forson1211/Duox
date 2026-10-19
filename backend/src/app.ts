@@ -556,6 +556,49 @@ export function createApplication(
     }),
   );
   api.get("/users/me", (req, res) => res.json({ user: account(req.user!) }));
+  api.get(
+    "/rooms/:code/preview",
+    wrap(async (req, res) => {
+      const code = z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^DUO-[A-Z2-9]{6}$/)
+        .parse(req.params.code);
+      res.json(
+        await (durableMode ? durable : rooms).preview(req.user!.id, code),
+      );
+    }),
+  );
+  api.get(
+    "/users/me/stats",
+    wrap(async (req, res) => {
+      const user = req.user!;
+      const [result] = await MatchResult.aggregate<{ bestScore: number }>([
+        { $match: { userId: user.id } },
+        { $group: { _id: null, bestScore: { $max: "$score" } } },
+      ]);
+      const rank =
+        user.visibility === "public"
+          ? 1 +
+            (await User.countDocuments({
+              status: "active",
+              visibility: "public",
+              $or: [
+                { points: { $gt: user.points } },
+                { points: user.points, _id: { $gt: user._id } },
+              ],
+            }))
+          : null;
+      res.json({
+        bestScore: result?.bestScore ?? 0,
+        rank,
+        winRate: user.matches
+          ? Math.round((user.wins / user.matches) * 100)
+          : 0,
+      });
+    }),
+  );
   api.patch(
     "/users/me",
     wrap(async (req, res) => {
@@ -590,6 +633,7 @@ export function createApplication(
       await mongoose.connection.transaction(async (session) => {
         await User.deleteOne({ _id: user.id }, { session });
         await Session.deleteMany({ userId: user.id }, { session });
+        await PlayerPresence.deleteOne({ _id: user.id }, { session });
         await ResetToken.deleteMany({ userId: user.id }, { session });
         await Friendship.deleteMany(
           { $or: [{ requesterId: user.id }, { recipientId: user.id }] },
@@ -642,7 +686,15 @@ export function createApplication(
     "/matches",
     wrap(async (req, res) =>
       res.status(201).json({
-        room: await rooms.create(req.user!.id, roomSchema.parse(req.body)),
+        room: durableMode
+          ? (
+              await durable.execute(
+                req.user!.id,
+                "room:create",
+                roomSchema.parse(req.body),
+              )
+            ).room
+          : await rooms.create(req.user!.id, roomSchema.parse(req.body)),
       }),
     ),
   );
@@ -652,7 +704,11 @@ export function createApplication(
       const { code } = z
         .object({ code: z.string().trim().toUpperCase().max(12) })
         .parse(req.body);
-      res.json({ room: await rooms.join(req.user!.id, code) });
+      res.json({
+        room: durableMode
+          ? (await durable.execute(req.user!.id, "room:join", { code })).room
+          : await rooms.join(req.user!.id, code),
+      });
     }),
   );
   api.get(

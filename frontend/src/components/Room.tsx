@@ -1,3 +1,4 @@
+import { PersonalBest } from "./Progress";
 import { GameArt } from "./GameArt";
 import { Avatar } from "./Avatar";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -58,7 +59,9 @@ export function RoomPage() {
   }, []);
   useEffect(() => {
     if (room?.status === "round-results") {
-      const myScore = room.results.at(-1)?.scores.find((s) => s.userId === user.id);
+      const myScore = room.results
+        .at(-1)
+        ?.scores.find((s) => s.userId === user.id);
       if (myScore?.correct) {
         playCorrect();
       } else if (myScore) {
@@ -250,7 +253,10 @@ export function RoomPage() {
                 </button>
               </div>
               <div className="lobby-settings">
-                <span>{room.settings.rounds} rounds</span>
+                <span>
+                  {room.settings.rounds} round
+                  {room.settings.rounds === 1 ? "" : "s"}
+                </span>
                 <span>{room.settings.duration}s answer time</span>
                 <span>
                   {room.players.length}/{room.settings.maxPlayers} players
@@ -327,6 +333,7 @@ export function RoomPage() {
               </p>
             </section>
           )}
+          {room.status === "completed" && <PersonalBest />}
           {room.status === "completed" && (
             <section className="panel match-results">
               <div className="result-trophy">
@@ -519,13 +526,17 @@ export function GameRound({
   const [falseStart, setFalseStart] = useState(false);
   const [reactionMs, setReactionMs] = useState<number | null>(null);
   const [playerTappedTile, setPlayerTappedTile] = useState<number | null>(null);
-  const [rackLetters, setRackLetters] = useState<{ char: string; origIndex: number }[]>([]);
+  const [rackLetters, setRackLetters] = useState<
+    { char: string; origIndex: number }[]
+  >([]);
   const [usedIndices, setUsedIndices] = useState<number[]>([]);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
 
   useEffect(() => {
     if (c.gameId === "word-blitz" && c.letters) {
-      setRackLetters(c.letters.split("").map((char, origIndex) => ({ char, origIndex })));
+      setRackLetters(
+        c.letters.split("").map((char, origIndex) => ({ char, origIndex })),
+      );
       setWord("");
       setUsedIndices([]);
     }
@@ -538,7 +549,9 @@ export function GameRound({
   const viewing = c.gameId === "memory-rush" && now < (c.showUntil ?? 0);
   const stepDuration = 650;
   const elapsedSinceStart = Math.max(0, now - c.startedAt);
-  const activeStep = viewing ? Math.floor(elapsedSinceStart / stepDuration) : -1;
+  const activeStep = viewing
+    ? Math.floor(elapsedSinceStart / stepDuration)
+    : -1;
   const elapsedInStep = elapsedSinceStart % stepDuration;
   const isStepLit = viewing && elapsedInStep < 450;
   const activeTile = isStepLit ? c.sequence?.[activeStep] : undefined;
@@ -546,7 +559,12 @@ export function GameRound({
   // Sound cue on memory step
   const lastPlayedStep = useRef(-1);
   useEffect(() => {
-    if (viewing && isStepLit && activeStep !== lastPlayedStep.current && activeTile !== undefined) {
+    if (
+      viewing &&
+      isStepLit &&
+      activeStep !== lastPlayedStep.current &&
+      activeTile !== undefined
+    ) {
       lastPlayedStep.current = activeStep;
       playMemoryTile(activeTile);
     }
@@ -611,9 +629,18 @@ export function GameRound({
 
   // Quick Quiz keyboard listener: A/1, B/2, C/3, D/4
   useEffect(() => {
-    if (c.gameId !== "quick-quiz" || disabled || !c.options) return;
+    if (
+      !["quick-quiz", "number-circuit"].includes(c.gameId) ||
+      disabled ||
+      !c.options
+    )
+      return;
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       const k = e.key.toUpperCase();
       let index = -1;
       if (k === "A" || k === "1") index = 0;
@@ -648,7 +675,11 @@ export function GameRound({
   useEffect(() => {
     if (c.gameId !== "memory-rush" || disabled || viewing) return;
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       if (["1", "2", "3", "4"].includes(e.key)) {
         e.preventDefault();
         handleTileClick(parseInt(e.key, 10) - 1);
@@ -673,10 +704,14 @@ export function GameRound({
   // Word Blitz interactive rack handlers
   const recomputeUsedIndices = (newWord: string) => {
     if (!c.letters) return;
-    const available = c.letters.split("").map((char, index) => ({ char, index }));
+    const available = c.letters
+      .split("")
+      .map((char, index) => ({ char, index }));
     const newUsed: number[] = [];
     for (const ch of newWord.toUpperCase()) {
-      const match = available.find((a) => a.char === ch && !newUsed.includes(a.index));
+      const match = available.find(
+        (a) => a.char === ch && !newUsed.includes(a.index),
+      );
       if (match) newUsed.push(match.index);
     }
     setUsedIndices(newUsed);
@@ -735,7 +770,8 @@ export function GameRound({
     setSoundEnabled(next);
   };
 
-  const targetLength = c.sequenceLength ?? c.sequence?.length ?? Math.max(sequence.length, 3);
+  const targetLength =
+    c.sequenceLength ?? c.sequence?.length ?? Math.max(sequence.length, 3);
 
   return (
     <section className="panel game-arena" data-game={c.gameId}>
@@ -777,7 +813,18 @@ export function GameRound({
         />
       </div>
       <h2>{c.prompt}</h2>
-      {c.gameId === "quick-quiz" && (
+      {c.gameId === "number-circuit" && (
+        <div className="number-circuit" aria-label="Math challenge">
+          <span className="circuit-eyebrow">QUICK THINKING. CLEAR MIND.</span>
+          <div className="circuit-expression">
+            {c.expression}
+            <span>=</span>
+            <b>?</b>
+          </div>
+          <p>Choose the result. Use keys 1 to 4 or tap your answer.</p>
+        </div>
+      )}
+      {(c.gameId === "quick-quiz" || c.gameId === "number-circuit") && (
         <div className="quiz-options">
           {c.options?.map((o, i) => (
             <button
@@ -790,7 +837,9 @@ export function GameRound({
                 void send(i);
               }}
             >
-              <span className="quiz-key-badge">{String.fromCharCode(65 + i)}</span>
+              <span className="quiz-key-badge">
+                {String.fromCharCode(65 + i)}
+              </span>
               <span>{o}</span>
               {chosen === i && submitted && <Check size={18} />}
             </button>
@@ -889,9 +938,70 @@ export function GameRound({
             </button>
           </form>
           <p className="muted">
-            Click letters or type to solve. Check your spelling before submitting.
+            Click letters or type to solve. Check your spelling before
+            submitting.
           </p>
         </>
+      )}
+      {c.gameId === "code-breaker" && (
+        <div className="code-breaker">
+          <p className="muted">
+            Three digits. No repeats. Read every clue before you commit.
+          </p>
+          <div className="code-clues" aria-label="Code clues">
+            {c.clues?.map((clue, index) => (
+              <article className="code-clue" key={clue.guess}>
+                <span className="clue-index">0{index + 1}</span>
+                <span
+                  className="clue-digits"
+                  aria-label={"Guess " + clue.guess}
+                >
+                  {[...clue.guess].map((digit, i) => (
+                    <b key={i}>{digit}</b>
+                  ))}
+                </span>
+                <span className="clue-feedback">
+                  <strong>{clue.placed} exact</strong>
+                  <small>{clue.misplaced} right digit, other position</small>
+                </span>
+              </article>
+            ))}
+          </div>
+          <form
+            className="code-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (/^\d{3}$/.test(word)) void send(word);
+            }}
+          >
+            <label className="field-label">
+              Your secret code
+              <input
+                aria-label="Your secret code"
+                inputMode="numeric"
+                autoComplete="off"
+                pattern="[0-9]{3}"
+                maxLength={3}
+                value={word}
+                disabled={disabled}
+                placeholder="000"
+                onChange={(event) =>
+                  setWord(event.target.value.replace(/\D/g, ""))
+                }
+              />
+            </label>
+            <button
+              className="btn btn-primary"
+              disabled={disabled || !/^\d{3}$/.test(word)}
+            >
+              Crack the code <ArrowRight size={16} />
+            </button>
+          </form>
+          <p className="code-rule">
+            Exact means the correct digit in the correct position. Other
+            positions count correct digits in the wrong place.
+          </p>
+        </div>
       )}
       {c.gameId === "memory-rush" && (
         <>

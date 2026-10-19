@@ -99,6 +99,7 @@ beforeAll(async () => {
   process.env.NODE_ENV = "test";
   mongo = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: "wiredTiger" },
+    instanceOpts: [{ launchTimeout: 60000 }],
   });
   await mongoose.connect(mongo.getUri("duo_clash_integration"));
   await Promise.all(allModels.map((m) => m.init()));
@@ -746,6 +747,11 @@ describe("real database, API, and socket integration", () => {
     expect(found.body.leaders).toHaveLength(1);
     expect(found.body.leaders[0].rank).toBe(2);
     expect(found.body.currentPlayer.rank).toBe(2);
+    const stats = await request(app.app)
+      .get("/api/v1/users/me/stats")
+      .set("Cookie", a.cookie);
+    expect(stats.body).toMatchObject({ rank: 2, bestScore: 0, winRate: 0 });
+
     expect(found.body.leaders[0]).not.toHaveProperty("email");
     expect(found.body.leaders[0]).not.toHaveProperty("passwordHash");
     const literal = await request(app.app)
@@ -759,5 +765,29 @@ describe("real database, API, and socket integration", () => {
     expect(
       dot.body.leaders.some((p: { id: string }) => p.id === a.user.id),
     ).toBe(true);
+  });
+  it("keeps administrator edits when starter content is seeded again", async () => {
+    const original = await Question.findOne({ key: "starter-1" }).lean();
+    expect(original).toBeTruthy();
+    await Question.updateOne(
+      { _id: original!._id },
+      {
+        $set: {
+          prompt: "An administrator edited this question",
+          active: false,
+        },
+      },
+    );
+    try {
+      await seedContent();
+      const edited = await Question.findById(original!._id).lean();
+      expect(edited!.prompt).toBe("An administrator edited this question");
+      expect(edited!.active).toBe(false);
+    } finally {
+      await Question.updateOne(
+        { _id: original!._id },
+        { $set: { prompt: original!.prompt, active: original!.active } },
+      );
+    }
   });
 });

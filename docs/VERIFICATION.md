@@ -1,4 +1,22 @@
-# Verification record — 2026-10-18
+# Verification record
+
+## Six-game release - 2026-10-19
+
+- Strict workspace TypeScript checks and production frontend/backend builds passed. The two checked-in backend bundles are byte-identical.
+- Backend: **45 distinct tests passed** across the full suite and final targeted regression run. The full run passed 42 tests; the final 26-test integration/durable run includes three additional regressions and reruns the affected game/auth tests.
+- Frontend: **10 tests passed**.
+- Generated puzzles: 100 code puzzles each resolve to exactly one distinct-digit solution without a clue revealing the answer; 200 arithmetic puzzles have four distinct options and the correct result.
+- Durable API verification uses three independent application instances. All six games save once, reject duplicate submissions, preserve scores, and reset correctly on rematch. Additional checks cover missed-deadline catch-up, saving immediately after the final answer, restart recovery, competing joins, host permissions, room preview privacy/blocks, personal standings, and preserving administrator-edited starter questions.
+- Native browser suite passed against built production frontend assets: two independent Chromium contexts, registration, private invites and preview, ready states, ranked quiz, saved results, rematch/leave, all four original game controls, friendships, player search/rankings, saved avatars, admin question authoring, and no browser exceptions.
+- Ten authenticated pages passed horizontal-overflow checks at **320, 390, and 768 pixels**. Device-synced light/dark themes and locally loaded Bricolage Grotesque were verified. Desktop and mobile screenshots were inspected.
+- Compiled production browser suite passed across **three separate API processes** with two mobile browsers: all six games in one ranked match, deliberate refresh during quiz, persisted results and leaderboard entries, rematch/leave, Secure cookie authentication, and JSON error responses. Public privacy/fair-play/help/accessibility pages passed at 320 px. No browser exceptions. The test uses the supported 45-second answer window for its deliberate reload.
+- Source and backend bundles contain no embedded database credentials. Real environment files remain ignored. Vercel configuration JSON and string includeFiles settings were checked.
+
+SMTP delivery, production capacity/load, and backup restoration require the operator's service configuration and operational testing.
+
+The historical records below describe the earlier revisions at the time they were tested.
+
+## Earlier verification - 2026-10-18
 
 ## Deployment authentication fix
 

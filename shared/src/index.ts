@@ -4,6 +4,8 @@ export const gameIds = [
   "memory-rush",
   "word-blitz",
   "reflex-race",
+  "number-circuit",
+  "code-breaker",
 ] as const;
 export type GameId = (typeof gameIds)[number];
 export const games = [
@@ -34,6 +36,20 @@ export const games = [
     category: "REACTION",
     description: "Wait for GO. Then make your move.",
     tone: "blue",
+  },
+  {
+    id: "number-circuit",
+    title: "Number Circuit",
+    category: "MENTAL MATH",
+    description: "Connect the numbers. Beat the clock. Keep your mind sharp.",
+    tone: "blue",
+  },
+  {
+    id: "code-breaker",
+    title: "Code Breaker",
+    category: "LOGIC",
+    description: "A secret code. A handful of clues. One clever deduction.",
+    tone: "orange",
   },
 ] satisfies {
   id: GameId;
@@ -73,7 +89,7 @@ export const roomSchema = z
     gameIds: z
       .array(z.enum(gameIds))
       .min(1)
-      .max(4)
+      .max(gameIds.length)
       .default([...gameIds]),
     rounds: z.number().int().min(1).max(20).default(10),
     maxPlayers: z.number().int().min(1).max(8).default(2),
@@ -144,6 +160,9 @@ export interface Challenge {
   sequenceLength?: number;
   showUntil?: number;
   signalAt?: number;
+  expression?: string;
+  clues?: { guess: string; placed: number; misplaced: number }[];
+  codeLength?: number;
   startedAt: number;
   deadline: number;
 }
