@@ -601,6 +601,19 @@ export class RoomManager {
     }
     this.broadcast(r);
   }
+  chat(userId: string, text: string) {
+    const r = this.rooms.get(this.membership.get(userId) ?? "");
+    const m = r?.members.get(userId);
+    if (!r || !m) throw new AppError("You are not in a room.", 404);
+    const msg = {
+      userId,
+      displayName: m.player.displayName,
+      avatar: m.player.avatar,
+      text: text.trim().slice(0, 200),
+      at: Date.now(),
+    };
+    this.io.to(r.code).emit("chat:message", msg);
+  }
   disconnect(userId: string, socketId: string) {
     const r = this.rooms.get(this.membership.get(userId) ?? "");
     const m = r?.members.get(userId);
@@ -767,6 +780,11 @@ export class RoomManager {
       on("match:start", empty, () => this.start(userId));
       on("match:rematch", empty, () => this.rematch(userId));
       on("answer:submit", answerSchema, (d) => this.submit(userId, d));
+      on(
+        "chat:send",
+        z.object({ code: z.string().min(6).max(12), text: z.string().min(1).max(200) }),
+        (d) => this.chat(userId, d.text),
+      );
       socket.on("disconnect", () => this.disconnect(userId, socket.id));
     });
   }

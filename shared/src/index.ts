@@ -186,6 +186,13 @@ export interface RoomState {
 export type Reply<T = undefined> =
   { ok: true; data: T } | { ok: false; error: string };
 export type Ack<T = undefined> = (reply: Reply<T>) => void;
+export interface ChatMessage {
+  userId: string;
+  displayName: string;
+  avatar: string;
+  text: string;
+  at: number;
+}
 export interface ClientEvents {
   "room:create": (settings: RoomSettings, ack: Ack<RoomState>) => void;
   "room:join": (payload: { code: string }, ack: Ack<RoomState>) => void;
@@ -195,10 +202,12 @@ export interface ClientEvents {
   "match:start": (payload: Record<string, never>, ack: Ack) => void;
   "match:rematch": (payload: Record<string, never>, ack: Ack) => void;
   "answer:submit": (payload: Answer, ack: Ack) => void;
+  "chat:send": (payload: { code: string; text: string }, ack: Ack) => void;
 }
 export interface ServerEvents {
   "room:state": (room: RoomState) => void;
   "room:error": (message: string) => void;
+  "chat:message": (msg: ChatMessage) => void;
 }
 export const achievements = [
   {

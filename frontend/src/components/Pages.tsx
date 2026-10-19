@@ -739,6 +739,8 @@ export function Friends() {
   const query = useQueryClient();
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
+  const [discoverSearch, setDiscoverSearch] = useState("");
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["friends"],
     queryFn: () =>
@@ -753,6 +755,14 @@ export function Friends() {
         blocked: Player[];
       }>("/friends"),
     refetchInterval: 30000,
+  });
+  const discover = useQuery({
+    queryKey: ["discover", discoverSearch],
+    queryFn: () =>
+      api<{ users: (Player & { online: boolean })[]; total: number }>(
+        `/users/discover/all?q=${encodeURIComponent(discoverSearch)}`,
+      ),
+    refetchInterval: 60000,
   });
   const run = async (path: string, body: unknown = {}, method = "POST") => {
     setBusy(true);
@@ -770,9 +780,27 @@ export function Friends() {
       setBusy(false);
     }
   };
+  const sendRequest = async (targetUsername: string) => {
+    setSendingTo(targetUsername);
+    try {
+      await api("/friends/requests", {
+        method: "POST",
+        body: JSON.stringify({ username: targetUsername }),
+      });
+      await Promise.all([
+        query.invalidateQueries({ queryKey: ["friends"] }),
+        query.invalidateQueries({ queryKey: ["discover"] }),
+      ]);
+      notify("Friend request sent!");
+    } catch (e) {
+      notify((e as Error).message);
+    } finally {
+      setSendingTo(null);
+    }
+  };
   return (
     <>
-      <Heading kicker="Better with your people" title="Friends & rivals." />
+      <Heading kicker="Better with your people" title="Friends &amp; rivals." />
       <form
         className="panel inline-form"
         onSubmit={(e) => {
@@ -869,6 +897,61 @@ export function Friends() {
           ))}
         </section>
       )}
+      {/* ── Discover Players ── */}
+      <section className="panel">
+        <div className="panel-title">
+          <h2>Discover Players</h2>
+          <span className="muted">Everyone playing DUO CLASH</span>
+        </div>
+        <label className="search-field" style={{ marginBottom: "1rem" }}>
+          <Search size={17} />
+          <input
+            type="search"
+            placeholder="Search players…"
+            value={discoverSearch}
+            onChange={(e) => setDiscoverSearch(e.target.value)}
+          />
+          {discoverSearch && (
+            <button
+              aria-label="Clear search"
+              onClick={() => setDiscoverSearch("")}
+            >
+              <X size={15} />
+            </button>
+          )}
+        </label>
+        <QueryStatus loading={discover.isLoading} error={discover.error} />
+        {discover.data && !discover.data.users.length && (
+          <Empty>No players found. Try a different search.</Empty>
+        )}
+        {discover.data?.users.map((p) => (
+          <div className="friend-row" key={p.id}>
+            <Avatar player={p} />
+            <Link to={"/app/players/" + p.username}>
+              <strong>{p.displayName}</strong>
+              <small>
+                @{p.username} · {p.online ? "🟢 Online" : "Offline"} ·{" "}
+                {p.points.toLocaleString()} pts
+              </small>
+            </Link>
+            <div className="row-actions">
+              <button
+                className="btn btn-primary"
+                disabled={sendingTo === p.username}
+                onClick={() => void sendRequest(p.username)}
+              >
+                {sendingTo === p.username ? "Sending…" : "Add friend"}
+                <Plus size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+        {(discover.data?.total ?? 0) > 20 && (
+          <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+            Showing top 20 results. Use search to find specific players.
+          </p>
+        )}
+      </section>
     </>
   );
 }

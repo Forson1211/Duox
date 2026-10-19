@@ -10,8 +10,11 @@ import {
   Crown,
   Delete,
   Home,
+  MessageCircle,
+  Pause,
   Plus,
   RotateCcw,
+  Send,
   Share2,
   Shuffle,
   Swords,
@@ -19,6 +22,7 @@ import {
   Users,
   Volume2,
   VolumeX,
+  X,
   Zap,
 } from "lucide-react";
 import {
@@ -38,6 +42,7 @@ import {
   type RoomState,
   type Challenge,
   type Answer,
+  type ChatMessage,
 } from "@duo-clash/shared";
 import { command, useApp } from "../lib/context";
 import { Heading } from "./Pages";
@@ -50,6 +55,14 @@ export function RoomPage() {
   const [now, setNow] = useState(Date.now());
   const offset = useRef(0);
   const leaving = useRef(false);
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  // Pause/confirm quit state
+  const [confirmQuit, setConfirmQuit] = useState(false);
   useEffect(() => {
     if (room) offset.current = room.serverNow - Date.now();
   }, [room?.serverNow]);
@@ -57,6 +70,23 @@ export function RoomPage() {
     const t = setInterval(() => setNow(Date.now() + offset.current), 50);
     return () => clearInterval(t);
   }, []);
+  // Listen for incoming chat messages
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (msg: ChatMessage) => {
+      setChatMessages((prev) => [...prev.slice(-99), msg]);
+      setChatUnread((n) => n + 1);
+    };
+    socket.on("chat:message" as any, handler);
+    return () => { socket.off("chat:message" as any, handler); };
+  }, [socket]);
+  // Scroll to bottom when chat opens or new message arrives
+  useEffect(() => {
+    if (chatOpen) {
+      setChatUnread(0);
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatOpen, chatMessages.length]);
   useEffect(() => {
     if (room?.status === "round-results") {
       const myScore = room.results
@@ -184,6 +214,29 @@ export function RoomPage() {
                 <strong>{p.score}</strong>
               </div>
             ))}
+          {/* In-game controls */}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            {host ? (
+              <button
+                className="btn btn-outline"
+                style={{ padding: "4px 10px", fontSize: "0.8rem" }}
+                onClick={() => setConfirmQuit(true)}
+                title="Pause / End game"
+              >
+                <Pause size={14} /> End
+              </button>
+            ) : (
+              <button
+                className="btn btn-outline"
+                style={{ padding: "4px 10px", fontSize: "0.8rem" }}
+                disabled={busy || !connected}
+                onClick={() => setConfirmQuit(true)}
+                title="Quit game"
+              >
+                <X size={14} /> Quit
+              </button>
+            )}
+          </div>
         </div>
       )}
       <div
@@ -501,6 +554,209 @@ export function RoomPage() {
           </p>
         </aside>
       </div>
+
+      {/* ── Confirm Quit / Cancel overlay ── */}
+      {confirmQuit && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: "1rem",
+          }}
+        >
+          <div
+            className="panel"
+            style={{ maxWidth: 380, width: "100%", textAlign: "center", gap: "1rem" }}
+          >
+            <h2>{host ? "End or pause this match?" : "Leave this match?"}</h2>
+            <p className="muted">
+              {host
+                ? "Leaving as host will cancel the match for everyone. Are you sure?"
+                : "You will leave the room and lose your progress in this match."}
+            </p>
+            <div className="lobby-buttons" style={{ justifyContent: "center" }}>
+              <button
+                className="btn btn-outline"
+                style={{ minWidth: 100 }}
+                disabled={busy || !connected}
+                onClick={async () => {
+                  await run("room:leave");
+                  setConfirmQuit(false);
+                }}
+              >
+                {host ? "Cancel match" : "Leave room"}
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ minWidth: 100 }}
+                onClick={() => setConfirmQuit(false)}
+              >
+                Stay & play
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── In-game Chat Panel ── */}
+      {room.status !== "cancelled" && (
+        <>
+          {/* Floating chat button */}
+          <button
+            aria-label="Toggle chat"
+            onClick={() => setChatOpen((o) => !o)}
+            style={{
+              position: "fixed", bottom: "5.5rem", right: "1.25rem",
+              width: 52, height: 52, borderRadius: "50%",
+              background: "var(--accent, #7c3aed)",
+              color: "#fff", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+              zIndex: 900, fontSize: "0.75rem", gap: 4,
+            }}
+          >
+            <MessageCircle size={22} />
+            {!chatOpen && chatUnread > 0 && (
+              <span
+                style={{
+                  position: "absolute", top: 2, right: 2,
+                  background: "#ef4444", color: "#fff",
+                  borderRadius: "50%", width: 18, height: 18,
+                  fontSize: "0.65rem", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, lineHeight: 1,
+                }}
+              >
+                {chatUnread > 9 ? "9+" : chatUnread}
+              </span>
+            )}
+          </button>
+
+          {/* Chat panel */}
+          {chatOpen && (
+            <div
+              style={{
+                position: "fixed", bottom: "5.5rem", right: "1.25rem",
+                width: "min(360px, calc(100vw - 2rem))",
+                height: "min(460px, 55vh)",
+                background: "var(--surface, #1a1a2e)",
+                border: "1px solid var(--border, rgba(255,255,255,0.1))",
+                borderRadius: 16, zIndex: 910, display: "flex",
+                flexDirection: "column", overflow: "hidden",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
+            >
+              {/* Chat header */}
+              <div
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderBottom: "1px solid var(--border, rgba(255,255,255,0.1))",
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: "center", fontWeight: 600, fontSize: "0.95rem",
+                }}
+              >
+                <span>💬 In-Game Chat</span>
+                <button
+                  style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7 }}
+                  onClick={() => setChatOpen(false)}
+                  aria-label="Close chat"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div
+                style={{
+                  flex: 1, overflowY: "auto", padding: "0.75rem",
+                  display: "flex", flexDirection: "column", gap: "0.5rem",
+                }}
+              >
+                {chatMessages.length === 0 && (
+                  <p style={{ color: "var(--muted, #888)", fontSize: "0.85rem", textAlign: "center", marginTop: "2rem" }}>
+                    No messages yet. Say hello! 👋
+                  </p>
+                )}
+                {chatMessages.map((msg, i) => {
+                  const isMe = msg.userId === user.id;
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        alignSelf: isMe ? "flex-end" : "flex-start",
+                        maxWidth: "80%",
+                      }}
+                    >
+                      {!isMe && (
+                        <span style={{ fontSize: "0.72rem", opacity: 0.6, marginBottom: 2, display: "block" }}>
+                          {msg.displayName}
+                        </span>
+                      )}
+                      <div
+                        style={{
+                          padding: "0.45rem 0.75rem",
+                          borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                          background: isMe ? "var(--accent, #7c3aed)" : "var(--border, rgba(255,255,255,0.1))",
+                          color: isMe ? "#fff" : "inherit",
+                          fontSize: "0.88rem",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <form
+                style={{
+                  padding: "0.6rem 0.75rem",
+                  borderTop: "1px solid var(--border, rgba(255,255,255,0.1))",
+                  display: "flex", gap: 8,
+                }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const text = chatText.trim();
+                  if (!text || !room) return;
+                  setChatText("");
+                  void command(socket, "chat:send", { code: room.code, text });
+                }}
+              >
+                <input
+                  style={{
+                    flex: 1, background: "var(--border, rgba(255,255,255,0.08))",
+                    border: "1px solid var(--border, rgba(255,255,255,0.15))",
+                    borderRadius: 8, padding: "0.4rem 0.6rem",
+                    color: "inherit", fontSize: "0.88rem",
+                    outline: "none",
+                  }}
+                  placeholder="Type a message…"
+                  maxLength={200}
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  autoComplete="off"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatText.trim() || !connected}
+                  style={{
+                    background: "var(--accent, #7c3aed)", border: "none",
+                    borderRadius: 8, padding: "0.4rem 0.6rem",
+                    color: "#fff", cursor: "pointer", display: "flex",
+                    alignItems: "center",
+                  }}
+                  aria-label="Send message"
+                >
+                  <Send size={16} />
+                </button>
+              </form>
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }

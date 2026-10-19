@@ -1,5 +1,5 @@
-﻿import { io, type Socket } from "socket.io-client";
-import type { ClientEvents, ServerEvents, RoomState } from "@duo-clash/shared";
+import { io, type Socket } from "socket.io-client";
+import type { ClientEvents, ServerEvents, RoomState, ChatMessage } from "@duo-clash/shared";
 import { api, post, ApiError } from "./api";
 
 type Events = {
@@ -8,6 +8,7 @@ type Events = {
   connect_error: () => void;
   "room:state": (room: RoomState | null) => void;
   "room:error": (message: string) => void;
+  "chat:message": (msg: ChatMessage) => void;
 };
 type Listener = (...args: any[]) => void;
 export class GameConnection {
@@ -24,6 +25,10 @@ export class GameConnection {
   on<E extends keyof Events>(event: E, listener: Events[E]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
     this.listeners.get(event)!.add(listener as Listener);
+    return this;
+  }
+  off<E extends keyof Events>(event: E, listener: Events[E]) {
+    this.listeners.get(event)?.delete(listener as Listener);
     return this;
   }
   private emit(event: keyof Events, ...args: unknown[]) {
@@ -57,6 +62,7 @@ export class GameConnection {
       socket.on("connect_error", () => this.emit("connect_error"));
       socket.on("room:state", (room) => this.emit("room:state", room));
       socket.on("room:error", (message) => this.emit("room:error", message));
+      socket.on("chat:message" as any, (msg: ChatMessage) => this.emit("chat:message", msg));
       socket.connect();
     } catch {
       if (this.stopped) return;

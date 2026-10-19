@@ -682,6 +682,52 @@ export function createApplication(
       res.json({ user: publicPlayer(u) });
     }),
   );
+  api.get(
+    "/users/discover/all",
+    wrap(async (req, res) => {
+      const id = req.user!.id;
+      const search = z.string().max(40).default("").parse(req.query.q);
+      const page = z.coerce.number().int().min(1).max(1000).default(1).parse(req.query.page);
+      // Get existing friendship/block IDs to exclude
+      const [friendships, blocks] = await Promise.all([
+        Friendship.find({ $or: [{ requesterId: id }, { recipientId: id }] }),
+        Block.find({ $or: [{ userId: id }, { targetId: id }] }),
+      ]);
+      const excludeIds = new Set<string>([id]);
+      for (const f of friendships) {
+        excludeIds.add(f.requesterId === id ? f.recipientId : f.requesterId);
+      }
+      for (const b of blocks) {
+        excludeIds.add(b.userId === id ? b.targetId : b.userId);
+      }
+      const query: Record<string, unknown> = {
+        status: "active",
+        visibility: "public",
+        _id: { $nin: [...excludeIds].map((eid) => new mongoose.Types.ObjectId(eid)) },
+      };
+      if (search) {
+        const escaped = [...search]
+          .map((c) => (".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92 ? "\\" + c : c))
+          .join("");
+        query.$or = [
+          { displayName: new RegExp(escaped, "i") },
+          { username: new RegExp(escaped, "i") },
+        ];
+      }
+      const [users, total] = await Promise.all([
+        User.find(query).sort({ points: -1 }).skip((page - 1) * 20).limit(20),
+        User.countDocuments(query),
+      ]);
+      const onlineIds = new Set(
+        [...io.sockets.sockets.values()].map((s) => s.data.userId as string)
+      );
+      res.json({
+        users: users.map((u) => ({ ...publicPlayer(u), online: onlineIds.has(u.id) })),
+        total,
+        page,
+      });
+    }),
+  );
   api.post(
     "/matches",
     wrap(async (req, res) =>
