@@ -80,6 +80,18 @@ export function RoomPage() {
     socket.on("chat:message" as any, handler);
     return () => { socket.off("chat:message" as any, handler); };
   }, [socket]);
+  // Sync room.chatMessages (essential for HTTP-polling / Vercel mode)
+  useEffect(() => {
+    if (room?.chatMessages && room.chatMessages.length > 0) {
+      setChatMessages((prev) => {
+        const seen = new Set(prev.map((m) => `${m.userId}:${m.at}:${m.text}`));
+        const fresh = room.chatMessages!.filter((m) => !seen.has(`${m.userId}:${m.at}:${m.text}`));
+        if (fresh.length === 0) return prev;
+        if (!chatOpen) setChatUnread((u) => u + fresh.length);
+        return [...prev, ...fresh].slice(-100);
+      });
+    }
+  }, [room?.chatMessages, chatOpen]);
   // Scroll to bottom when chat opens or new message arrives
   useEffect(() => {
     if (chatOpen) {

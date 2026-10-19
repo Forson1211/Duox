@@ -547,6 +547,7 @@ export function createApplication(
             "match:start",
             "match:rematch",
             "answer:submit",
+            "chat:send",
           ]),
           payload: z.unknown(),
         })

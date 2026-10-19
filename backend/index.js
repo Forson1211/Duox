@@ -122446,7 +122446,8 @@ var RoomManager = class {
       nextAt: room.nextAt,
       winnerIds: room.status === "completed" ? players.filter((p) => p.score === top).map((p) => p.id) : [],
       persisted: room.persisted,
-      ratingChanges: room.ratingChanges
+      ratingChanges: room.ratingChanges,
+      chatMessages: room.chatMessages ?? []
     };
   }
   broadcast(room) {
@@ -122870,6 +122871,21 @@ var RoomManager = class {
     }
     this.broadcast(r);
   }
+  chat(userId, text) {
+    const r = this.rooms.get(this.membership.get(userId) ?? "");
+    const m = r?.members.get(userId);
+    if (!r || !m) throw new AppError("You are not in a room.", 404);
+    const msg = {
+      userId,
+      displayName: m.player.displayName,
+      avatar: m.player.avatar,
+      text: text.trim().slice(0, 200),
+      at: Date.now()
+    };
+    r.chatMessages = [...(r.chatMessages ?? []).slice(-49), msg];
+    this.io.to(r.code).emit("chat:message", msg);
+    return msg;
+  }
   disconnect(userId, socketId) {
     const r = this.rooms.get(this.membership.get(userId) ?? "");
     const m = r?.members.get(userId);
@@ -123009,6 +123025,11 @@ var RoomManager = class {
       on("match:start", empty2, () => this.start(userId));
       on("match:rematch", empty2, () => this.rematch(userId));
       on("answer:submit", answerSchema, (d) => this.submit(userId, d));
+      on(
+        "chat:send",
+        external_exports.object({ code: external_exports.string().min(6).max(12), text: external_exports.string().min(1).max(200) }),
+        (d) => this.chat(userId, d.text)
+      );
       socket.on("disconnect", () => this.disconnect(userId, socket.id));
     });
   }
@@ -123271,6 +123292,13 @@ var DurableRooms = class {
           return manager.rematch(userId);
         case "answer:submit":
           return manager.submit(userId, answerSchema.parse(payload));
+        case "chat:send": {
+          const { text } = external_exports.object({
+            code: external_exports.string().min(6).max(12),
+            text: external_exports.string().min(1).max(200)
+          }).parse(payload);
+          return manager.chat(userId, text);
+        }
         default:
           throw new AppError("Unknown game action.", 400);
       }
@@ -123700,7 +123728,8 @@ If you did not request this, ignore this email.`
           "room:ready",
           "match:start",
           "match:rematch",
-          "answer:submit"
+          "answer:submit",
+          "chat:send"
         ]),
         payload: external_exports.unknown()
       }).strict().parse(req.body);
@@ -123806,6 +123835,49 @@ If you did not request this, ignore this email.`
       if (!u || u.visibility === "private" && u.id !== req.user.id)
         throw new AppError("Profile not found.", 404);
       res.json({ user: publicPlayer(u) });
+    })
+  );
+  api.get(
+    "/users/discover/all",
+    wrap2(async (req, res) => {
+      const id = req.user.id;
+      const search = external_exports.string().max(40).default("").parse(req.query.q);
+      const page = external_exports.coerce.number().int().min(1).max(1e3).default(1).parse(req.query.page);
+      const [friendships, blocks] = await Promise.all([
+        Friendship.find({ $or: [{ requesterId: id }, { recipientId: id }] }),
+        Block.find({ $or: [{ userId: id }, { targetId: id }] })
+      ]);
+      const excludeIds = /* @__PURE__ */ new Set([id]);
+      for (const f of friendships) {
+        excludeIds.add(f.requesterId === id ? f.recipientId : f.requesterId);
+      }
+      for (const b of blocks) {
+        excludeIds.add(b.userId === id ? b.targetId : b.userId);
+      }
+      const query = {
+        status: "active",
+        visibility: "public",
+        _id: { $nin: [...excludeIds].map((eid) => new import_mongoose3.default.Types.ObjectId(eid)) }
+      };
+      if (search) {
+        const escaped = [...search].map((c) => ".*+?^${}()|[]".includes(c) || c.charCodeAt(0) === 92 ? "\\" + c : c).join("");
+        query.$or = [
+          { displayName: new RegExp(escaped, "i") },
+          { username: new RegExp(escaped, "i") }
+        ];
+      }
+      const [users, total] = await Promise.all([
+        User.find(query).sort({ points: -1 }).skip((page - 1) * 20).limit(20),
+        User.countDocuments(query)
+      ]);
+      const onlineIds = new Set(
+        [...io2.sockets.sockets.values()].map((s) => s.data.userId)
+      );
+      res.json({
+        users: users.map((u) => ({ ...publicPlayer(u), online: onlineIds.has(u.id) })),
+        total,
+        page
+      });
     })
   );
   api.post(

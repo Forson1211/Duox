@@ -61,6 +61,7 @@ export interface LiveRoom {
   memoryHidden: boolean;
   completedPlayers?: RoomState["players"];
   usedQuizPrompts?: string[];
+  chatMessages?: ChatMessage[];
 }
 export function dailyInfo(now = new Date()) {
   const day = now.toISOString().slice(0, 10);
@@ -143,6 +144,7 @@ export class RoomManager {
           : [],
       persisted: room.persisted,
       ratingChanges: room.ratingChanges,
+      chatMessages: room.chatMessages ?? [],
     };
   }
   broadcast(room: LiveRoom) {
@@ -612,7 +614,9 @@ export class RoomManager {
       text: text.trim().slice(0, 200),
       at: Date.now(),
     };
+    r.chatMessages = [...(r.chatMessages ?? []).slice(-49), msg];
     this.io.to(r.code).emit("chat:message", msg);
+    return msg;
   }
   disconnect(userId: string, socketId: string) {
     const r = this.rooms.get(this.membership.get(userId) ?? "");

@@ -182,6 +182,7 @@ export interface RoomState {
   winnerIds: string[];
   persisted: boolean;
   ratingChanges: Record<string, number>;
+  chatMessages?: ChatMessage[];
 }
 export type Reply<T = undefined> =
   { ok: true; data: T } | { ok: false; error: string };

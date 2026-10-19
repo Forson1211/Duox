@@ -309,6 +309,15 @@ export class DurableRooms {
           return manager.rematch(userId);
         case "answer:submit":
           return manager.submit(userId, answerSchema.parse(payload));
+        case "chat:send": {
+          const { text } = z
+            .object({
+              code: z.string().min(6).max(12),
+              text: z.string().min(1).max(200),
+            })
+            .parse(payload);
+          return manager.chat(userId, text);
+        }
         default:
           throw new AppError("Unknown game action.", 400);
       }
