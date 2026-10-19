@@ -1,4 +1,4 @@
-﻿import { randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 export interface CodeClue {
   guess: string;
   placed: number;
@@ -61,10 +61,10 @@ export function makeCodePuzzle() {
   return { code, clues };
 }
 export function makeNumberPuzzle(round: number) {
-  const a = randomInt(2, 13),
-    b = randomInt(2, 13),
-    c = randomInt(2, 10);
-  const kind = round >= 5 ? randomInt(5) : randomInt(4);
+  const a = randomInt(2, 13);
+  const b = randomInt(2, 13);
+  const c = randomInt(2, 10);
+  const kind = round >= 5 ? randomInt(8) : round >= 3 ? randomInt(6) : randomInt(4);
   let expression: string, answer: number;
   switch (kind) {
     case 0:
@@ -83,9 +83,27 @@ export function makeNumberPuzzle(round: number) {
       expression = `${a * b} \u00f7 ${a}`;
       answer = b;
       break;
-    default:
+    case 4:
       expression = `${a} \u00d7 ${b} + ${c}`;
       answer = a * b + c;
+      break;
+    case 5:
+      expression = `${a * b + c} \u2212 ${c}`;
+      answer = a * b;
+      break;
+    case 6:
+      expression = `(${a} + ${b}) \u00d7 ${c}`;
+      answer = (a + b) * c;
+      break;
+    case 7: {
+      const sq = randomInt(3, 11);
+      expression = `${sq}\u00b2 + ${c}`;
+      answer = sq * sq + c;
+      break;
+    }
+    default:
+      expression = `${a} \u00d7 ${b} \u2212 ${c}`;
+      answer = a * b - c;
   }
   const choices = new Set([answer]);
   while (choices.size < 4) choices.add(answer + randomInt(-9, 10));

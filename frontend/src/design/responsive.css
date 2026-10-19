@@ -421,7 +421,11 @@
     padding: 19px;
   }
   .game-card p {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .quick-menu {
     padding: 20px 15px;

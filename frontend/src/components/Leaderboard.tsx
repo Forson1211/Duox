@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Crown, Search, Trophy, X } from "lucide-react";
@@ -35,7 +35,7 @@ export function Leaderboard() {
   });
   const leaders = rankings.data?.leaders ?? [];
   const podium = page === 1 && !query ? leaders.filter((p) => p.rank <= 3) : [];
-  const rows = podium.length ? leaders.filter((p) => p.rank > 3) : leaders;
+  const rows = leaders;
   const current = rankings.data?.currentPlayer;
   return (
     <div className="leaderboard-view">

@@ -159,11 +159,53 @@ try {
   await expect(
     discovered.getByRole("button", { name: "Add friend", exact: true }),
   ).toBeVisible();
+  await expect(
+    discovered.getByRole("img", { name: "Online", exact: true }),
+  ).toBeVisible();
   await discovered
     .getByRole("button", { name: "Add friend", exact: true })
     .click();
   await page.goto(`${base}/app/friends`);
   await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(
+    page
+      .locator(".friend-row")
+      .filter({ hasText: "Deploy Rival" })
+      .filter({
+        has: page.getByRole("button", { name: "Remove", exact: true }),
+      })
+      .getByRole("img", { name: "Online", exact: true }),
+  ).toBeVisible();
+  await expect(
+    discovered.getByRole("button", { name: "Remove", exact: true }),
+  ).toBeVisible();
+  await expect(
+    discovered.getByRole("img", { name: "Online", exact: true }),
+  ).toBeVisible();
+  await guest.evaluate(() => window.scrollTo(0, 0));
+  await guest.screenshot({
+    path: "artifacts/friends-online-mobile.png",
+    fullPage: true,
+  });
+  await page.goto(`${base}/app/play`);
+  await expect(page.locator(".game-card").last()).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(0);
+  expect(
+    await page.locator(".app-header").evaluate((el) => ({
+      top: el.getBoundingClientRect().top,
+      position: getComputedStyle(el).position,
+      color: getComputedStyle(el).backgroundColor,
+    })),
+  ).toEqual({ top: 0, position: "fixed", color: "rgb(117, 72, 232)" });
+  await page.screenshot({
+    path: "artifacts/purple-header-desktop.png",
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   console.log(
     "PASS: automatic player discovery and friend requests between new accounts",
   );
@@ -227,6 +269,7 @@ try {
     path: "artifacts/room-chat-desktop.png",
     fullPage: true,
   });
+  await guest.evaluate(() => window.scrollTo(0, 0));
   await guest.screenshot({
     path: "artifacts/room-chat-mobile.png",
     fullPage: true,
@@ -237,6 +280,85 @@ try {
   await expect(
     page.getByText("Game paused for everyone", { exact: true }),
   ).toBeVisible();
+  // Keep clocks frozen while exercising a full conversation through the API.
+  for (let i = 0; i < 12; i++) {
+    await page.waitForTimeout(550);
+    const response = await context.request.post(
+      `${base}/api/v1/realtime/command`,
+      {
+        headers: { Origin: base },
+        data: {
+          event: "chat:send",
+          payload: {
+            code,
+            text: `Round ${i + 1}: Great game! Ready for another challenge?`,
+          },
+        },
+      },
+    );
+    expect(response.ok()).toBe(true);
+  }
+  await guest.getByRole("button", { name: /^Chat/ }).click();
+  await expect(guest.getByRole("log")).toContainText("Round 12:");
+  await guest.getByRole("log").evaluate((el) => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  const chatHeaderTop = (await guest.locator(".chat-header").boundingBox())!.y;
+  const composerTop = (await guest.locator(".chat-footer").boundingBox())!.y;
+  await page.getByRole("button", { name: /^Chat/ }).click();
+  await page.waitForTimeout(550);
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("A new message while you read");
+  await page.getByLabel("Message", { exact: true }).press("Enter");
+  await expect(
+    guest.getByRole("button", { name: "New messages" }),
+  ).toBeVisible();
+  expect(await guest.getByRole("log").evaluate((el) => el.scrollTop)).toBe(0);
+  expect((await guest.locator(".chat-header").boundingBox())!.y).toBe(
+    chatHeaderTop,
+  );
+  expect((await guest.locator(".chat-footer").boundingBox())!.y).toBe(
+    composerTop,
+  );
+  await guest.getByRole("button", { name: "New messages" }).click();
+  await expect(guest.getByRole("button", { name: "New messages" })).toHaveCount(
+    0,
+  );
+  await guest
+    .getByRole("button", { name: "Choose emoji", exact: true })
+    .click();
+  await guest
+    .getByRole("button", { name: "Insert \u{1F3C6}", exact: true })
+    .click();
+  await guest
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await expect(page.getByRole("log").locator(".chat-emoji-only")).toHaveText(
+    "\u{1F3C6}",
+  );
+  await guest.setViewportSize({ width: 320, height: 700 });
+  await guest.emulateMedia({ colorScheme: "dark" });
+  expect(
+    await guest.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const mobileChat = (await guest.locator(".room-chat-panel").boundingBox())!;
+  expect(mobileChat.y).toBeGreaterThanOrEqual(72);
+  expect(mobileChat.y + mobileChat.height).toBeLessThanOrEqual(700);
+  await guest.screenshot({
+    path: "artifacts/modern-chat-dark-mobile.png",
+    fullPage: false,
+  });
+  await guest.emulateMedia({ colorScheme: "light" });
+  await guest.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Close chat" }).click();
+  await guest.getByRole("button", { name: "Close chat" }).click();
+  console.log(
+    "PASS: green friend presence, fixed purple header, grouped chat, emoji sending, independent conversation scrolling, and 320px chat layout",
+  );
   await page.screenshot({
     path: "artifacts/game-controls-desktop.png",
     fullPage: true,

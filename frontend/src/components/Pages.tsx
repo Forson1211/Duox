@@ -1,7 +1,7 @@
 import { PlayerStanding, HomeCommunity } from "./Progress";
 import { GameCards } from "./GameCards";
 import { GameArt } from "./GameArt";
-import { Avatar } from "./Avatar";
+import { Avatar, PresenceAvatar } from "./Avatar";
 import { useState, useEffect, type FormEvent, type ReactNode } from "react";
 import {
   Link,
@@ -198,11 +198,7 @@ export function Dashboard() {
             <br />
             <span>Even better company.</span>
           </h2>
-          <p>
-            A quick challenge. A friendly rivalry.
-            <br />
-            Something to smile about together.
-          </p>
+          <p>Play quick challenges together.</p>
           <Link className="btn btn-white btn-large" to="/app/rooms/create">
             Create a challenge
             <ArrowUpRight size={18} />
@@ -272,7 +268,6 @@ export function Dashboard() {
       </div>
       <GameCards />
       <div className="dashboard-lower">
-        <History />
         <DailyChallenge compact />
       </div>
       <HomeCommunity />
@@ -850,7 +845,7 @@ export function Friends() {
         )}
         {q.data?.friends.map((f) => (
           <div className="friend-row" key={f.id}>
-            <Avatar player={f.user} />
+            <PresenceAvatar player={f.user} online={f.online} />
             <Link to={"/app/players/" + f.user.username}>
               <strong>{f.user.displayName}</strong>
               <small>
@@ -947,7 +942,7 @@ export function Friends() {
         )}
         {discover.data?.users.map((p) => (
           <div className="friend-row" key={p.id}>
-            <Avatar player={p} />
+            <PresenceAvatar player={p} online={p.online} />
             <div className="discovered-player-name">
               {p.visibility === "public" ? (
                 <Link to={"/app/players/" + p.username}>

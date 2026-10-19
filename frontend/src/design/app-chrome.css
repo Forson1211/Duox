@@ -1,0 +1,101 @@
+.game-app {
+  --app-header-height: 84px;
+  --app-sidebar-width: 222px;
+}
+.game-app .app-body {
+  padding-top: var(--app-header-height);
+}
+.game-app .app-header {
+  position: fixed;
+  top: 0;
+  left: var(--app-sidebar-width);
+  right: 0;
+  z-index: 40;
+  height: var(--app-header-height);
+  background: #7548e8;
+  color: #fff;
+  border-bottom: 1px solid #ffffff12;
+  box-shadow: 0 4px 18px #30115c12;
+}
+.app-header .header-person {
+  color: #fff;
+}
+.app-header .header-person small {
+  color: #eee6ff;
+}
+.app-header .header-person .character-avatar {
+  border-color: #ffffffb3;
+  box-shadow: 0 0 0 3px #ffffff15;
+}
+.app-header .greeting-wave {
+  color: #ffe09d;
+}
+.app-header .connection {
+  color: #eee6ff;
+}
+.app-header .connection.online > i {
+  background: #72efb2;
+  box-shadow: 0 0 0 3px #72efb21a;
+}
+.app-header > .mobile-menu,
+.app-header .header-tools > .icon-btn,
+.app-header .notification-bell-btn,
+.app-header .notification-bell-btn.has-unread {
+  color: #fff;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.app-header > .mobile-menu:hover,
+.app-header .header-tools > .icon-btn:hover,
+.app-header .notification-bell-btn:hover {
+  background: transparent !important;
+  opacity: 0.8;
+}
+.app-header .notification-badge {
+  border-color: #7548e8;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.app-header .header-level {
+  color: #fff;
+  background: #ffffff20;
+}
+.presence-avatar {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+  width: fit-content;
+  height: fit-content;
+}
+.presence-dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  background: #21c77b;
+  border: 2.5px solid var(--surface);
+  border-radius: 50%;
+}
+.friend-row .presence-avatar {
+  align-self: center;
+}
+@media (max-width: 1050px) {
+  .game-app {
+    --app-sidebar-width: 200px;
+  }
+}
+@media (max-width: 900px) {
+  .game-app {
+    --app-sidebar-width: 0px;
+    --app-header-height: 76px;
+  }
+}
+@media (max-width: 370px) {
+  .game-app {
+    --app-header-height: 72px;
+  }
+}

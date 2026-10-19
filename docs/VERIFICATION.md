@@ -1,5 +1,12 @@
 # Verification record
 
+## Chat, header, and friend presence - 2026-10-19
+
+- The chat uses grouped incoming/outgoing messages, date separators, compact timestamps, an emoji picker, and a growing message composer. Its message area scrolls independently; reading older messages preserves the scroll position and offers a shortcut to new messages.
+- The app header uses the brand purple in both themes and stays fixed above the scrolling content. Header heights and sticky game controls share responsive offsets.
+- Friend and discovery avatars show a green badge only when the server reports the player online, using the existing native/socket or durable HTTP presence data.
+- Frontend tests: **10 passed**. Production frontend build includes strict TypeScript checks.
+
 ## Multiplayer controls and chat - 2026-10-19
 
 - `npm.cmd run check` passed: strict workspace TypeScript checks, **55 backend tests**, **10 frontend tests**, and production builds. Both checked-in backend bundles are byte-identical.

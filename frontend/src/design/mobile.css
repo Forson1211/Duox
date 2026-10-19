@@ -30,11 +30,26 @@
     height: 32px;
   }
   .header-tools .notification-badge {
-    top: 2px;
-    right: 2px;
-    min-width: 15px;
-    height: 15px;
-    font-size: 12px;
+    top: 1px;
+    right: 1px;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    max-height: 18px;
+    aspect-ratio: 1 / 1;
+    padding: 0 !important;
+    margin: 0;
+    border-radius: 50% !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    flex-shrink: 0;
   }
   .connection {
     margin-right: 3px;
@@ -144,42 +159,66 @@
     width: 14px;
   }
   .dashboard-hero {
-    min-height: 237px;
-    padding: 24px 21px;
-    border-radius: 23px;
+    min-height: auto;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 26px 20px 0;
+    border-radius: 24px;
+    overflow: hidden;
   }
   .hero-poster-copy {
-    max-width: 72%;
+    max-width: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin: 0 auto;
+    z-index: 2;
   }
   .poster-label {
     font-size: 13px;
-    gap: 5px;
+    gap: 6px;
+    justify-content: center;
   }
   .dashboard-hero h2 {
-    font-size: 28px;
-    letter-spacing: -0.9px;
-    margin: 14px 0 11px;
+    font-size: 26px;
+    line-height: 1.2;
+    letter-spacing: -0.6px;
+    margin: 10px 0 6px;
+    text-align: center;
   }
   .dashboard-hero p {
-    font-size: 14px;
-    line-height: 1.8;
-    max-width: 170px;
-    margin-bottom: 17px;
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 290px;
+    margin: 0 auto 16px;
+    text-align: center;
   }
   .dashboard-hero .btn {
-    min-height: 39px;
-    padding: 9px 12px;
+    min-height: 40px;
+    padding: 10px 18px;
     font-size: 14px;
     gap: 7px;
+    margin: 0 auto;
+    align-self: center;
   }
   .dashboard-hero .btn > svg {
     width: 15px;
   }
   .hero-characters {
-    width: 205px;
-    max-height: 225px;
-    right: -34px;
-    bottom: -2px;
+    position: relative;
+    right: auto;
+    left: auto;
+    bottom: -4px;
+    margin: 16px auto 0;
+    width: 220px;
+    max-width: 82%;
+    max-height: 200px;
+    display: block;
+    object-fit: contain;
+    z-index: 1;
     opacity: 0.98;
   }
   .quick-menu {
@@ -312,9 +351,12 @@
     margin: 6px 0 8px;
   }
   .game-card p {
-    font-size: 14px;
-    line-height: 1.7;
-    min-height: 55px;
+    font-size: 13px;
+    line-height: 1.4;
+    min-height: unset;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .game-card-bottom {
     gap: 5px;
@@ -649,23 +691,49 @@
     gap: 15px;
   }
   .friend-row {
-    flex-wrap: wrap;
-    gap: 11px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 0;
+  }
+  .friend-row > a,
+  .friend-row .discovered-player-name {
+    flex: 1;
+    min-width: 0;
   }
   .friend-row .row-actions {
-    width: 100%;
-    padding-left: 49px;
+    width: auto;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+    padding-left: 0;
   }
   .friend-row strong {
-    font-size: 15px;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
   }
   .friend-row small {
-    font-size: 13px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    margin-top: 2px;
   }
   .friend-row .btn {
-    font-size: 14px;
-    min-height: 36px;
-    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 34px;
+    padding: 6px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .profile-card {
     gap: 18px;
@@ -1423,27 +1491,29 @@
     width: 12px;
   }
   .dashboard-hero {
-    padding: 22px 18px;
-    min-height: 226px;
+    padding: 22px 16px 0;
+    min-height: auto;
   }
   .dashboard-hero h2 {
-    font-size: 26px;
+    font-size: 24px;
   }
   .dashboard-hero p {
     font-size: 13px;
+    max-width: 260px;
   }
   .hero-characters {
-    width: 188px;
-    right: -39px;
-    bottom: 2px;
+    width: 200px;
+    max-width: 85%;
+    bottom: -4px;
+    margin: 14px auto 0;
   }
   .hero-poster-copy {
-    max-width: 75%;
+    max-width: 100%;
   }
   .dashboard-hero .btn {
     font-size: 13px;
-    padding: 9px 11px;
-    min-height: 37px;
+    padding: 9px 15px;
+    min-height: 38px;
   }
   .quick-menu {
     padding: 17px 6px;
@@ -1506,9 +1576,12 @@
     font-size: 16px;
   }
   .game-card p {
-    font-size: 14px;
-    line-height: 1.8;
-    min-height: 55px;
+    font-size: 13px;
+    line-height: 1.4;
+    min-height: unset;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .cover-tag {
     font-size: 13px;
@@ -1730,24 +1803,30 @@
 }
 @media (max-width: 600px) {
   .hero-characters {
-    width: 180px;
-    right: -3px;
-    bottom: -3px;
+    width: 200px;
+    max-width: 82%;
+    right: auto;
+    left: auto;
+    bottom: -4px;
+    margin: 14px auto 0;
   }
   .hero-poster-copy {
-    max-width: 70%;
+    max-width: 100%;
   }
   .dashboard-hero p {
-    max-width: 154px;
+    max-width: 280px;
   }
 }
 @media (max-width: 370px) {
   .hero-characters {
-    width: 166px;
-    right: -12px;
-    bottom: 0;
+    width: 175px;
+    max-width: 85%;
+    right: auto;
+    left: auto;
+    bottom: -2px;
+    margin: 12px auto 0;
   }
   .dashboard-hero p {
-    max-width: 137px;
+    max-width: 240px;
   }
 }

@@ -398,23 +398,55 @@ export function createApplication(
         ? [
             {
               $match: {
-                completedAt: { $gte: since },
-                ...(eligible ? { userId: { $in: eligible } } : {}),
+                status: "active",
+                visibility: "public",
+                ...(eligible
+                  ? {
+                      _id: {
+                        $in: eligible.map(
+                          (id) => new mongoose.Types.ObjectId(id),
+                        ),
+                      },
+                    }
+                  : {}),
               },
             },
-            { $group: { _id: "$userId", points: { $sum: "$points" } } },
-            { $set: { userObjectId: { $toObjectId: "$_id" } } },
             {
               $lookup: {
-                from: User.collection.name,
-                localField: "userObjectId",
-                foreignField: "_id",
-                as: "user",
+                from: MatchResult.collection.name,
+                let: { uid: { $toString: "$_id" } },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $and: [
+                          { $eq: ["$userId", "$$uid"] },
+                          { $gte: ["$completedAt", since] },
+                        ],
+                      },
+                    },
+                  },
+                  {
+                    $group: {
+                      _id: null,
+                      totalPoints: { $sum: "$points" },
+                    },
+                  },
+                ],
+                as: "matchStats",
               },
             },
-            { $unwind: "$user" },
             {
-              $match: { "user.status": "active", "user.visibility": "public" },
+              $project: {
+                _id: { $toString: "$_id" },
+                points: {
+                  $ifNull: [
+                    { $arrayElemAt: ["$matchStats.totalPoints", 0] },
+                    0,
+                  ],
+                },
+                user: "$$ROOT",
+              },
             },
           ]
         : [
@@ -492,17 +524,11 @@ export function createApplication(
           },
         },
       ];
-      const [result] = weekly
-        ? await MatchResult.aggregate<{
-            leaders: RankedRow[];
-            total: { count: number }[];
-            current: RankedRow[];
-          }>(pipeline)
-        : await User.aggregate<{
-            leaders: RankedRow[];
-            total: { count: number }[];
-            current: RankedRow[];
-          }>(pipeline);
+      const [result] = await User.aggregate<{
+        leaders: RankedRow[];
+        total: { count: number }[];
+        current: RankedRow[];
+      }>(pipeline);
       const serialize = (row: RankedRow) => ({
         ...publicPlayer(User.hydrate(row.user)),
         periodPoints: row.points,

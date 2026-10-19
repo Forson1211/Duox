@@ -44,6 +44,27 @@ const characters = {
     style: 5,
   },
 };
+export function PresenceAvatar({
+  player,
+  online,
+}: {
+  player: Pick<Player, "avatar" | "displayName">;
+  online: boolean;
+}) {
+  return (
+    <span className="presence-avatar" data-online={online}>
+      <Avatar player={player} />
+      {online && (
+        <span
+          className="presence-dot"
+          role="img"
+          aria-label="Online"
+          title="Online"
+        />
+      )}
+    </span>
+  );
+}
 export function Avatar({
   player,
   large = false,
