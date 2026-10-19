@@ -58,7 +58,7 @@
   border-radius: 99px;
   background: var(--lavender);
   color: var(--purple);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 .welcome-copy h1 {
@@ -90,7 +90,7 @@
   gap: 15px;
   flex-wrap: wrap;
   margin-top: 23px;
-  font-size: 10px;
+  font-size: 13px;
   color: #a093ae;
 }
 .welcome-promise > span {
@@ -192,14 +192,14 @@
   border-radius: 11px;
 }
 .art-caption strong {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   display: block;
 }
 .art-caption small {
   display: block;
   margin-top: 4px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
 }
 .welcome-star {
@@ -334,17 +334,17 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   font-weight: 600;
 }
 .welcome-leader > b {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   white-space: nowrap;
 }
 .welcome-leader small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--muted);
 }
@@ -375,7 +375,7 @@
   letter-spacing: -0.8px;
 }
 .welcome-invite > p {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.8;
   color: #d9caf7;
   margin: 0 0 25px;
@@ -388,7 +388,7 @@
   border-top: 1px solid var(--line);
   padding: 30px 0;
   margin-top: 65px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
 }
 .welcome-footer > .brand {
@@ -396,5 +396,5 @@
   color: var(--ink);
 }
 .welcome-footer small {
-  font-size: 10px;
+  font-size: 12px;
 }

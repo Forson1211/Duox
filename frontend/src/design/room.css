@@ -51,7 +51,7 @@
 .lobby > .section-kicker {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .lobby h2 {
   font-size: 28px;
@@ -103,7 +103,7 @@
   gap: 15px;
   margin: 22px 0 17px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .lobby > .badge-list {
   justify-content: center;
@@ -128,13 +128,13 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .room-player small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 5px;
   line-height: 1.6;
@@ -156,18 +156,18 @@
   border: 1px dashed var(--line);
   border-radius: 11px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .leave-button {
   width: 100%;
-  font-size: 12px;
+  font-size: 14px;
 }
 .fair-play {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.9;
   padding: 5px;
 }
@@ -206,7 +206,7 @@
   gap: 18px;
 }
 .arena-top .section-kicker {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--purple);
   font-weight: 600;
   line-height: 1.5;
@@ -483,7 +483,7 @@
 }
 .arena-progress {
   text-align: center;
-  font-size: 10px;
+  font-size: 13px;
   margin-top: 23px;
 }
 .round-summary h2 {
@@ -511,7 +511,7 @@
   flex: 1;
 }
 .round-score > small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .round-score > strong {
@@ -535,7 +535,7 @@
 .match-results > .section-kicker {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .match-results h2 {
   font-size: 30px;
@@ -570,7 +570,7 @@
 }
 .final-score > div > small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 5px;
 }
@@ -579,7 +579,7 @@
   font-weight: 700;
 }
 .final-score > strong > small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 400;
 }
@@ -602,7 +602,7 @@
   line-height: 1.9;
 }
 .round-details small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .live-score-strip {
@@ -645,14 +645,14 @@
     min-width: 27px;
   }
   .live-score-strip > div > span:not(.character-avatar) {
-    font-size: 10px;
-    max-width: 80px;
+    font-size: 12px;
+    max-width: 90px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .live-score-strip strong {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--purple);
     margin-left: 2px;
   }

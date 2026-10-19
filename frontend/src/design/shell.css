@@ -20,7 +20,7 @@
 }
 .sidebar-label {
   margin: 39px 15px 15px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--muted);
   letter-spacing: 1.2px;
@@ -37,7 +37,7 @@
   padding: 12px 15px;
   min-height: 43px;
   border-radius: 13px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 550;
   color: var(--muted);
   transition: background 0.18s;
@@ -73,7 +73,7 @@
 .sidebar-callout p {
   margin: 10px 0 0;
   color: #9a88b6;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.9;
 }
 .sidebar-bottom > button {
@@ -83,7 +83,7 @@
   border: 0;
   background: none;
   padding: 20px 15px 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 .app-body {
@@ -117,7 +117,7 @@
   min-width: 0;
 }
 .header-person small {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
 }
 .header-person strong {
@@ -147,14 +147,14 @@
   border-radius: 11px;
   background: var(--lavender);
   color: var(--purple);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 650;
 }
 .connection {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
   margin-right: 5px;
@@ -185,7 +185,7 @@
   padding: 12px 40px;
   background: var(--lavender);
   color: var(--purple);
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.6;
 }
 .resume-banner strong {
@@ -211,7 +211,7 @@
   border: 1px solid #b5a1e9;
   border-radius: 15px;
   box-shadow: 0 8px 30px #3a2a5b20;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .toast > button {
@@ -247,10 +247,10 @@
   right: 4px;
   background: #f43f5e;
   color: #ffffff;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
-  min-width: 17px;
-  height: 17px;
+  min-width: 19px;
+  height: 19px;
   padding: 0 4px;
   border-radius: 99px;
   display: flex;
@@ -331,7 +331,7 @@
   color: var(--ink);
 }
 .unread-pill {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 99px;
@@ -346,7 +346,7 @@
 .notif-action-btn {
   border: 0;
   background: none;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   display: inline-flex;
@@ -468,7 +468,7 @@ html[data-theme="dark"] .notif-system,
   margin-bottom: 2px;
 }
 .notif-title {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -481,7 +481,7 @@ html[data-theme="dark"] .notif-system,
   display: inline-block;
 }
 .notif-message {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   margin: 0 0 5px;
   line-height: 1.45;
@@ -493,11 +493,11 @@ html[data-theme="dark"] .notif-system,
   gap: 8px;
 }
 .notif-time {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .notif-action-link {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--purple);
   display: inline-flex;
@@ -544,7 +544,7 @@ html[data-theme="dark"] .notif-system,
   color: var(--ink);
 }
 .notification-empty p {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   margin: 0;
   max-width: 220px;
@@ -559,7 +559,7 @@ html[data-theme="dark"] .notif-system,
   border-top: 1px solid var(--line);
 }
 .notif-bottom-link {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 650;
   color: var(--purple);
   display: inline-flex;

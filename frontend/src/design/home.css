@@ -1,4 +1,4 @@
-﻿.dashboard-hero {
+.dashboard-hero {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -20,7 +20,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 13px;
   color: #eee5ff;
   font-weight: 500;
 }
@@ -79,7 +79,7 @@
   flex-direction: column;
   gap: 10px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 550;
   text-align: center;
   line-height: 1.5;
@@ -152,7 +152,7 @@
 }
 .metric > div > span,
 .metric > span:not(.metric-symbol) {
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
 }
 .metric > svg {
@@ -185,7 +185,7 @@
 }
 .history-row small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 5px;
   line-height: 1.6;
@@ -232,7 +232,7 @@
 }
 .daily-card .section-kicker {
   color: #9b81be;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 650;
 }
 .daily-card h2 {
@@ -337,14 +337,14 @@
   border-radius: 7px;
   background: #ffffffb8;
   color: #776880;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 550;
 }
 .game-card-copy {
   padding: 18px 17px 15px;
 }
 .game-category {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.65px;
   color: var(--game-color);
@@ -356,7 +356,7 @@
   line-height: 1.2;
 }
 .game-card p {
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--muted);
   min-height: 38px;
@@ -373,7 +373,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
 }

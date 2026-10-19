@@ -4,11 +4,11 @@
     padding: 0 19px;
   }
   .header-person small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .header-person strong {
     max-width: 135px;
-    font-size: 13px;
+    font-size: 15px;
   }
   .header-person .avatar-small {
     width: 38px;
@@ -34,13 +34,40 @@
     right: 2px;
     min-width: 15px;
     height: 15px;
-    font-size: 8.5px;
+    font-size: 12px;
   }
   .connection {
     margin-right: 3px;
   }
   .greeting-wave {
     margin-left: 2px;
+  }
+  .bottom-nav {
+    min-height: 80px;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  .bottom-nav > a {
+    gap: 5px;
+    min-width: 48px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .bottom-nav > a > svg {
+    width: 22px;
+    height: 22px;
+  }
+  .bottom-nav > a:nth-child(3) {
+    margin-top: -24px;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .bottom-nav > a:nth-child(3) > svg {
+    width: 52px;
+    height: 52px;
+    padding: 13px;
+    border-radius: 50%;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 6px 16px rgba(138, 97, 223, 0.35);
   }
   .app-content {
     padding: 16px 19px 22px;
@@ -56,7 +83,7 @@
     letter-spacing: -0.9px;
   }
   .page-heading > .btn {
-    font-size: 11px;
+    font-size: 14px;
     min-height: 38px;
     padding: 9px 12px;
   }
@@ -66,13 +93,13 @@
     gap: 12px;
   }
   .home-view > .page-heading .section-kicker {
-    font-size: 9px;
+    font-size: 13px;
   }
   .home-view > .page-heading h1 {
     font-size: 25px;
   }
   .home-view > .page-heading > .btn {
-    font-size: 10px;
+    font-size: 14px;
     padding: 9px 11px;
     gap: 6px;
   }
@@ -88,7 +115,7 @@
     max-width: 72%;
   }
   .poster-label {
-    font-size: 8px;
+    font-size: 13px;
     gap: 5px;
   }
   .dashboard-hero h2 {
@@ -97,7 +124,7 @@
     margin: 14px 0 11px;
   }
   .dashboard-hero p {
-    font-size: 10px;
+    font-size: 14px;
     line-height: 1.8;
     max-width: 170px;
     margin-bottom: 17px;
@@ -105,7 +132,7 @@
   .dashboard-hero .btn {
     min-height: 39px;
     padding: 9px 12px;
-    font-size: 10px;
+    font-size: 14px;
     gap: 7px;
   }
   .dashboard-hero .btn > svg {
@@ -134,7 +161,7 @@
     height: 21px;
   }
   .quick-menu > a {
-    font-size: 9px;
+    font-size: 13px;
     gap: 9px;
     font-weight: 550;
   }
@@ -158,19 +185,19 @@
     font-size: 23px;
   }
   .metric > div > span {
-    font-size: 10px;
+    font-size: 14px;
   }
   .section-heading h2 {
     font-size: 22px;
     letter-spacing: -0.7px;
   }
   .section-heading p {
-    font-size: 11px;
+    font-size: 14px;
     margin-top: 6px;
     line-height: 1.6;
   }
   .section-heading .text-link {
-    font-size: 10px;
+    font-size: 14px;
     gap: 5px;
   }
   .home-view > .section-heading {
@@ -204,7 +231,7 @@
   }
   .home-view > .section-heading .text-link {
     margin: 4px auto 0;
-    font-size: 11px;
+    font-size: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -225,7 +252,7 @@
     max-width: 110%;
   }
   .cover-tag {
-    font-size: 7px;
+    font-size: 13px;
     top: 10px;
     left: 9px;
     padding: 4px 6px;
@@ -240,7 +267,7 @@
     padding: 15px 12px 13px;
   }
   .game-category {
-    font-size: 7px;
+    font-size: 13px;
     letter-spacing: 0.65px;
   }
   .game-card h3 {
@@ -248,7 +275,7 @@
     margin: 6px 0 8px;
   }
   .game-card p {
-    font-size: 11px;
+    font-size: 14px;
     line-height: 1.7;
     min-height: 55px;
   }
@@ -257,7 +284,7 @@
     margin-top: 13px;
   }
   .game-card-bottom > span {
-    font-size: 8px;
+    font-size: 13px;
     gap: 4px;
   }
   .game-card-bottom > span > svg {
@@ -286,17 +313,17 @@
     font-size: 17px;
   }
   .panel-title > .muted {
-    font-size: 9px;
+    font-size: 13px;
   }
   .history-row {
     gap: 11px;
     padding: 16px 0;
   }
   .history-row strong {
-    font-size: 11px;
+    font-size: 14px;
   }
   .history-row small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .result-badge {
     width: 34px;
@@ -312,10 +339,10 @@
     font-size: 27px;
   }
   .daily-card > p {
-    font-size: 11px;
+    font-size: 14px;
   }
   .daily-card .btn-white {
-    font-size: 11px;
+    font-size: 14px;
     min-height: 40px;
   }
   .daily-reward {
@@ -342,7 +369,7 @@
   .instructions li {
     position: relative;
     padding-left: 39px;
-    font-size: 11px;
+    font-size: 14px;
   }
   .instructions li:before {
     position: absolute;
@@ -355,17 +382,17 @@
     max-width: 220px;
   }
   .instructions li strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .instructions > .muted {
-    font-size: 10px;
+    font-size: 14px;
     margin-top: 22px;
   }
   .form-grid {
     gap: 0 13px;
   }
   .field-label {
-    font-size: 11px;
+    font-size: 14px;
   }
   .field-label input,
   .field-label select {
@@ -377,7 +404,7 @@
   }
   .game-picker label {
     padding: 13px 12px;
-    font-size: 12px;
+    font-size: 15px;
     gap: 10px;
     border-radius: 13px;
     min-height: 57px;
@@ -387,13 +414,13 @@
     height: 19px;
   }
   .game-picker legend {
-    font-size: 11px;
+    font-size: 14px;
   }
   .check-label {
-    font-size: 11px;
+    font-size: 14px;
   }
   .setup-form > .muted {
-    font-size: 10px;
+    font-size: 14px;
   }
   .join-form {
     padding: 28px 24px;
@@ -422,7 +449,7 @@
     gap: 3px;
   }
   .board-tabs > button {
-    font-size: 10px;
+    font-size: 14px;
     min-height: 34px;
     padding: 9px 5px;
     border-radius: 11px;
@@ -448,10 +475,10 @@
     min-width: 80px;
   }
   .podium-player > strong {
-    font-size: 11px;
+    font-size: 14px;
   }
   .podium-points {
-    font-size: 9px;
+    font-size: 13px;
     gap: 3px;
     margin-bottom: 13px;
   }
@@ -460,7 +487,7 @@
     height: 10px;
   }
   .podium-points > small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .podium-pillar {
     height: 39px;
@@ -481,7 +508,7 @@
   .podium-medal {
     width: 21px;
     height: 21px;
-    font-size: 11px;
+    font-size: 14px;
   }
   .standings-sheet {
     border-radius: 22px;
@@ -496,10 +523,10 @@
     font-size: 17px;
   }
   .standings-heading > span {
-    font-size: 9px;
+    font-size: 13px;
   }
   .ranking-labels {
-    font-size: 9px;
+    font-size: 13px;
     padding: 0 9px 12px;
     grid-template-columns: 29px 1fr auto;
     gap: 7px;
@@ -513,7 +540,7 @@
   }
   .ranking-row .rank-number {
     width: 18px;
-    font-size: 10px;
+    font-size: 14px;
   }
   .ranking-row .character-avatar {
     width: 30px;
@@ -521,13 +548,13 @@
     min-width: 30px;
   }
   .ranking-row strong {
-    font-size: 10px;
+    font-size: 14px;
   }
   .ranking-row small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .ranking-row > strong > small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .ranking-list {
     gap: 9px;
@@ -540,7 +567,7 @@
   }
   .your-standing .rank-number {
     width: 18px;
-    font-size: 11px;
+    font-size: 14px;
   }
   .your-standing .character-avatar {
     width: 33px;
@@ -548,26 +575,26 @@
     min-width: 33px;
   }
   .your-standing > div > strong {
-    font-size: 10px;
+    font-size: 14px;
   }
   .your-standing > div > strong > span {
-    font-size: 7px;
-  }
-  .your-standing small {
-    font-size: 8px;
-  }
-  .your-standing > strong {
     font-size: 13px;
   }
+  .your-standing small {
+    font-size: 13px;
+  }
+  .your-standing > strong {
+    font-size: 15px;
+  }
   .your-standing > strong > small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .board-period-note {
-    font-size: 9px;
+    font-size: 13px;
     margin-top: 15px;
   }
   .board-footnote {
-    font-size: 11px;
+    font-size: 14px;
     padding: 12px 0;
   }
   .board-empty {
@@ -577,7 +604,7 @@
     font-size: 23px;
   }
   .board-empty p {
-    font-size: 12px;
+    font-size: 15px;
   }
   .inline-form {
     flex-direction: column;
@@ -593,13 +620,13 @@
     padding-left: 49px;
   }
   .friend-row strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .friend-row small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .friend-row .btn {
-    font-size: 10px;
+    font-size: 14px;
     min-height: 36px;
     padding: 8px 12px;
   }
@@ -620,10 +647,10 @@
     font-size: 22px;
   }
   .profile-card p {
-    font-size: 11px;
+    font-size: 14px;
   }
   .profile-card .muted {
-    font-size: 10px;
+    font-size: 14px;
     line-height: 1.9;
   }
   .profile-card .row-actions {
@@ -631,7 +658,7 @@
     padding-left: 92px;
   }
   .profile-card .row-actions .btn {
-    font-size: 10px;
+    font-size: 14px;
     min-height: 35px;
     padding: 8px 12px;
   }
@@ -654,12 +681,12 @@
     line-height: 1.3;
   }
   .achievement p {
-    font-size: 10px;
+    font-size: 14px;
     line-height: 1.75;
     min-height: 47px;
   }
   .achievement-state {
-    font-size: 8px;
+    font-size: 13px;
     padding: 6px 8px;
     border-radius: 7px;
   }
@@ -667,14 +694,14 @@
     gap: 0;
   }
   .tabs > button {
-    font-size: 10px;
+    font-size: 14px;
     padding: 12px 13px;
   }
   .admin-row strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .admin-row .btn {
-    font-size: 10px;
+    font-size: 14px;
     padding: 8px 11px;
     min-height: 35px;
   }
@@ -691,7 +718,7 @@
     text-align: center;
   }
   .auth-card > .section-kicker {
-    font-size: 9px;
+    font-size: 13px;
     display: block;
     text-align: center;
   }
@@ -699,11 +726,11 @@
     text-align: center;
   }
   .auth-links {
-    font-size: 10px;
+    font-size: 14px;
     gap: 15px;
   }
   .room-code {
-    font-size: 12px;
+    font-size: 15px;
     padding: 10px 12px;
   }
   .room-layout {
@@ -716,10 +743,10 @@
     font-size: 25px;
   }
   .lobby > .section-kicker {
-    font-size: 10px;
+    font-size: 14px;
   }
   .lobby > .muted {
-    font-size: 11px;
+    font-size: 14px;
   }
   .lobby-symbol {
     width: 87px;
@@ -738,7 +765,7 @@
     gap: 9px;
   }
   .lobby-buttons .btn {
-    font-size: 11px;
+    font-size: 14px;
     padding: 10px 12px;
     min-height: 41px;
   }
@@ -746,22 +773,22 @@
     width: 15px;
   }
   .lobby-settings {
-    font-size: 10px;
+    font-size: 14px;
     gap: 11px;
   }
   .lobby > .badge-list > span {
-    font-size: 9px;
+    font-size: 13px;
     padding: 7px 9px;
   }
   .lobby > .btn-large {
     min-width: 180px;
-    font-size: 12px;
+    font-size: 15px;
   }
   .room-player strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .room-player small {
-    font-size: 10px;
+    font-size: 14px;
   }
   .room-player .character-avatar {
     width: 38px;
@@ -775,13 +802,13 @@
     font-size: 17px;
   }
   .fair-play {
-    font-size: 9px;
+    font-size: 13px;
   }
   .game-arena {
     padding: 24px 18px;
   }
   .arena-top .section-kicker {
-    font-size: 10px;
+    font-size: 14px;
     max-width: 200px;
   }
   .timer {
@@ -806,7 +833,7 @@
   .quiz-options > button {
     padding: 13px 12px;
     min-height: 61px;
-    font-size: 13px;
+    font-size: 15px;
     gap: 12px;
     border-radius: 14px;
   }
@@ -815,7 +842,7 @@
     height: 30px;
     min-width: 30px;
     border-radius: 9px;
-    font-size: 11px;
+    font-size: 14px;
   }
   .letter-rack {
     gap: 7px;
@@ -835,13 +862,13 @@
   }
   .word-form > .btn {
     height: 44px;
-    font-size: 12px;
+    font-size: 15px;
   }
   .word-form .field-label {
-    font-size: 11px;
+    font-size: 14px;
   }
   .game-arena > .muted {
-    font-size: 10px;
+    font-size: 14px;
   }
   .memory-grid {
     gap: 13px;
@@ -853,7 +880,7 @@
     font-size: 32px;
   }
   .memory-instruction {
-    font-size: 12px;
+    font-size: 15px;
   }
   .sequence-input {
     gap: 7px;
@@ -861,7 +888,7 @@
   .sequence-input > span:not(.muted) {
     width: 27px;
     height: 31px;
-    font-size: 13px;
+    font-size: 15px;
     border-radius: 8px;
   }
   .reflex-pad {
@@ -874,10 +901,10 @@
     font-size: 45px;
   }
   .reflex-pad > span {
-    font-size: 10px;
+    font-size: 14px;
   }
   .submission-status {
-    font-size: 10px;
+    font-size: 14px;
     gap: 7px;
     padding: 13px 10px;
   }
@@ -886,7 +913,7 @@
     min-width: 15px;
   }
   .arena-progress {
-    font-size: 9px;
+    font-size: 13px;
   }
   .countdown-panel {
     min-height: 370px;
@@ -901,18 +928,18 @@
     font-size: 28px;
   }
   .answer-reveal {
-    font-size: 12px;
+    font-size: 15px;
     padding: 17px;
     border-radius: 14px;
     line-height: 1.9;
   }
   .round-score {
-    font-size: 12px;
+    font-size: 15px;
     gap: 8px;
     flex-wrap: wrap;
   }
   .round-score > small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .match-results {
     padding: 31px 21px 23px;
@@ -927,32 +954,32 @@
     font-size: 28px;
   }
   .match-results > .muted {
-    font-size: 11px;
+    font-size: 14px;
   }
   .final-score {
     gap: 12px;
     padding: 18px 0;
   }
   .final-score strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .final-score > strong {
     font-size: 23px;
   }
   .final-score > div > small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .final-score > strong > small {
-    font-size: 9px;
+    font-size: 13px;
   }
   .round-details summary {
-    font-size: 11px;
+    font-size: 14px;
   }
   .round-details > div {
-    font-size: 11px;
+    font-size: 14px;
   }
   .round-details small {
-    font-size: 10px;
+    font-size: 14px;
   }
   .welcome-header {
     padding: 22px 20px;
@@ -982,7 +1009,7 @@
     gap: 6px;
     background: #7548e8 !important;
     color: #ffffff !important;
-    font-size: 13px !important;
+    font-size: 15px !important;
     font-weight: 700 !important;
     min-height: 38px !important;
     padding: 8px 16px !important;
@@ -1028,10 +1055,10 @@
     gap: 9px;
   }
   .art-caption strong {
-    font-size: 10px;
+    font-size: 14px;
   }
   .art-caption small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .art-caption > span {
     width: 29px;
@@ -1058,7 +1085,7 @@
     margin: 0 auto;
   }
   .welcome-tag {
-    font-size: 9px;
+    font-size: 13px;
     padding: 7px 10px;
     gap: 6px;
     margin: 0 auto;
@@ -1074,7 +1101,7 @@
     text-align: center;
   }
   .welcome-copy > p {
-    font-size: 12px;
+    font-size: 15px;
     line-height: 1.9;
     max-width: 350px;
     margin: 0 auto;
@@ -1089,7 +1116,7 @@
   .welcome-cta .btn {
     min-height: 44px;
     padding: 11px 13px;
-    font-size: 11px;
+    font-size: 14px;
     gap: 7px;
   }
   .welcome-cta .btn > svg {
@@ -1098,7 +1125,7 @@
   .welcome-promise {
     margin-top: 19px;
     gap: 12px;
-    font-size: 8px;
+    font-size: 12px;
     justify-content: center;
     width: 100%;
   }
@@ -1129,7 +1156,7 @@
     width: 100%;
   }
   .welcome-games .section-kicker {
-    font-size: 11px;
+    font-size: 14px;
     text-align: center;
     display: block;
     width: 100%;
@@ -1183,7 +1210,7 @@
     width: 100%;
   }
   .how-section .section-kicker {
-    font-size: 11px;
+    font-size: 14px;
     text-align: center;
     display: block;
     width: 100%;
@@ -1229,7 +1256,7 @@
     margin: 2px 0 8px;
   }
   .how-grid p {
-    font-size: 11px;
+    font-size: 14px;
     line-height: 1.7;
     max-width: 230px;
   }
@@ -1265,7 +1292,7 @@
     width: 100%;
   }
   .welcome-leaders .section-kicker {
-    font-size: 11px;
+    font-size: 14px;
     text-align: center;
     display: block;
     width: 100%;
@@ -1282,10 +1309,10 @@
     font-size: 31px;
   }
   .welcome-invite > p {
-    font-size: 11px;
+    font-size: 14px;
   }
   .welcome-invite > .btn {
-    font-size: 11px;
+    font-size: 14px;
     min-height: 42px;
     padding: 11px 15px;
   }
@@ -1300,15 +1327,15 @@
     gap: 16px;
     margin-top: 42px;
     padding: 25px 0;
-    font-size: 10px;
+    font-size: 14px;
   }
   .welcome-footer > span {
     width: 100%;
     order: 3;
-    font-size: 10px;
+    font-size: 14px;
   }
   .welcome-footer small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .welcome-footer > .brand {
     font-size: 19px;
@@ -1324,10 +1351,10 @@
   }
   .header-person strong {
     max-width: 113px;
-    font-size: 12px;
+    font-size: 15px;
   }
   .header-person small {
-    font-size: 8px;
+    font-size: 13px;
   }
   .header-person .avatar-small {
     width: 35px;
@@ -1345,13 +1372,13 @@
     padding: 15px 15px 22px;
   }
   .home-view > .page-heading .section-kicker {
-    font-size: 8px;
+    font-size: 13px;
   }
   .home-view > .page-heading h1 {
     font-size: 22px;
   }
   .home-view > .page-heading > .btn {
-    font-size: 9px;
+    font-size: 13px;
     padding: 9px;
     gap: 5px;
   }
@@ -1366,7 +1393,7 @@
     font-size: 26px;
   }
   .dashboard-hero p {
-    font-size: 9px;
+    font-size: 13px;
   }
   .hero-characters {
     width: 188px;
@@ -1377,7 +1404,7 @@
     max-width: 75%;
   }
   .dashboard-hero .btn {
-    font-size: 9px;
+    font-size: 13px;
     padding: 9px 11px;
     min-height: 37px;
   }
@@ -1385,7 +1412,7 @@
     padding: 17px 6px;
   }
   .quick-menu > a {
-    font-size: 8px;
+    font-size: 13px;
   }
   .quick-icon {
     width: 40px;
@@ -1409,17 +1436,17 @@
     font-size: 21px;
   }
   .metric > div > span {
-    font-size: 9px;
+    font-size: 13px;
   }
   .section-heading h2 {
     font-size: 21px;
   }
   .section-heading p {
-    font-size: 10px;
+    font-size: 14px;
     max-width: 190px;
   }
   .section-heading .text-link {
-    font-size: 9px;
+    font-size: 13px;
   }
   .game-grid {
     gap: 11px;
@@ -1442,18 +1469,18 @@
     font-size: 16px;
   }
   .game-card p {
-    font-size: 10px;
+    font-size: 14px;
     line-height: 1.8;
     min-height: 55px;
   }
   .cover-tag {
-    font-size: 6px;
+    font-size: 13px;
     padding: 4px 5px;
     left: 8px;
     top: 9px;
   }
   .game-card-bottom > span {
-    font-size: 7px;
+    font-size: 13px;
     gap: 3px;
   }
   .game-card .game-play {
@@ -1480,14 +1507,14 @@
     min-width: 72px;
   }
   .podium-player > strong {
-    font-size: 10px;
+    font-size: 14px;
   }
   .podium-points {
-    font-size: 8px;
+    font-size: 13px;
     gap: 2px;
   }
   .podium-points small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .ranking-row {
     padding: 10px 8px;
@@ -1500,13 +1527,13 @@
   }
   .ranking-row .rank-number {
     width: 15px;
-    font-size: 9px;
+    font-size: 13px;
   }
   .ranking-row strong {
-    font-size: 9px;
+    font-size: 13px;
   }
   .ranking-row > strong > small {
-    font-size: 7px;
+    font-size: 13px;
   }
   .board-title h1 {
     font-size: 22px;
@@ -1516,17 +1543,17 @@
     gap: 7px;
   }
   .your-standing > div > strong {
-    font-size: 9px;
+    font-size: 13px;
   }
   .your-standing > div > strong > span {
-    font-size: 6px;
+    font-size: 13px;
     padding: 2px 4px;
   }
   .your-standing small {
-    font-size: 7px;
+    font-size: 13px;
   }
   .your-standing > strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .profile-card {
     padding: 25px 17px;
@@ -1541,7 +1568,7 @@
     font-size: 20px;
   }
   .profile-card p {
-    font-size: 10px;
+    font-size: 14px;
   }
   .profile-card .row-actions {
     padding-left: 78px;
@@ -1554,7 +1581,7 @@
   }
   .quiz-options > button {
     padding: 12px 10px;
-    font-size: 12px;
+    font-size: 15px;
     gap: 10px;
   }
   .letter-rack {
@@ -1574,7 +1601,7 @@
     font-size: 41px;
   }
   .reflex-pad > span {
-    font-size: 9px;
+    font-size: 13px;
   }
   .welcome-main {
     padding: 0 16px;
@@ -1589,11 +1616,11 @@
     width: 29px;
   }
   .welcome-actions .btn {
-    font-size: 10px;
+    font-size: 14px;
     padding: 8px 10px;
   }
   .welcome-actions .welcome-play-btn {
-    font-size: 12px !important;
+    font-size: 15px !important;
     padding: 8px 14px !important;
     min-height: 36px !important;
   }
@@ -1609,7 +1636,7 @@
     text-align: center;
   }
   .welcome-copy > p {
-    font-size: 11px;
+    font-size: 14px;
     text-align: center;
     margin: 0 auto;
   }
@@ -1618,7 +1645,7 @@
     width: 100%;
   }
   .welcome-cta .btn {
-    font-size: 10px;
+    font-size: 14px;
     padding: 10px 11px;
     gap: 6px;
   }
@@ -1626,7 +1653,7 @@
     width: 14px;
   }
   .welcome-promise {
-    font-size: 7px;
+    font-size: 13px;
     gap: 8px;
     justify-content: center;
     width: 100%;
@@ -1638,7 +1665,7 @@
     margin: 6px auto 0;
   }
   .welcome-games .section-kicker {
-    font-size: 9.5px;
+    font-size: 13px;
     text-align: center;
   }
   .welcome-games .text-link {
@@ -1651,7 +1678,7 @@
     margin: 6px auto 0;
   }
   .how-section .section-kicker {
-    font-size: 9.5px;
+    font-size: 13px;
     text-align: center;
   }
 }

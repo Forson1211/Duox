@@ -1,4 +1,4 @@
-﻿.leaderboard-view {
+.leaderboard-view {
   max-width: 820px;
   margin: 0 auto;
 }
@@ -161,7 +161,7 @@
   justify-content: center;
   gap: 4px;
   margin: 6px 0 14px;
-  font-size: 11px;
+  font-size: 13px;
   color: #8c7a9d;
   white-space: nowrap;
 }
@@ -170,7 +170,7 @@
   fill: #f5ce78;
 }
 .podium-points small {
-  font-size: 10px;
+  font-size: 12px;
 }
 .podium-pillar {
   height: 40px;
@@ -218,14 +218,14 @@
   margin: 0;
 }
 .standings-heading > span {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
 }
 .ranking-labels {
   display: grid;
   grid-template-columns: 39px 1fr auto;
   gap: 11px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   padding: 0 14px 13px;
 }
@@ -291,13 +291,13 @@
 }
 .ranking-row small {
   display: block;
-  font-size: 9px;
+  font-size: 13px;
   color: #e4d9ff;
   margin-top: 3px;
 }
 .ranking-row > strong > small {
   display: inline;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   margin: 0;
   color: #eee5ff;
@@ -342,12 +342,12 @@
   padding: 3px 6px;
   border-radius: 5px;
   background: #fff9;
-  font-size: 8px;
+  font-size: 12px;
   color: #8a6eb9;
 }
 .your-standing small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -358,12 +358,12 @@
 }
 .your-standing > strong > small {
   display: inline;
-  font-size: 10px;
+  font-size: 12px;
 }
 .board-period-note {
   text-align: center;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 13px;
   margin: 18px 0 0;
   line-height: 1.7;
 }

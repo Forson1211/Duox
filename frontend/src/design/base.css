@@ -38,6 +38,10 @@ html[data-theme="dark"],
     color-scheme: dark;
   }
 }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 html,
 body,
 #root {
@@ -286,7 +290,7 @@ html[data-theme="dark"] .logo-dark,
   margin: 0;
 }
 .panel-title > .muted {
-  font-size: 11px;
+  font-size: 13px;
 }
 .page-heading {
   display: flex;
@@ -452,7 +456,7 @@ html[data-theme="dark"] .logo-dark,
   background: var(--lavender);
   color: var(--purple);
   padding: 8px 11px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
 }
 .pagination {
@@ -463,12 +467,12 @@ html[data-theme="dark"] .logo-dark,
   padding-top: 20px;
   margin-top: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .pagination .btn {
   min-height: 36px;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .character-avatar {
   display: inline-flex;
@@ -535,7 +539,7 @@ html[data-theme="dark"] .logo-dark,
 .friend-row small,
 .admin-row small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--muted);
   line-height: 1.7;
   margin-top: 4px;
@@ -581,12 +585,12 @@ html[data-theme="dark"] .logo-dark,
   margin: 0 0 7px;
 }
 .profile-card p {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin: 0 0 10px;
 }
 .profile-card .muted {
-  font-size: 11px;
+  font-size: 13px;
 }
 .achievement-grid {
   display: grid;
@@ -621,7 +625,7 @@ html[data-theme="dark"] .logo-dark,
 }
 .achievement-state {
   display: inline-block;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   padding: 7px 11px;
   background: var(--bg);
@@ -697,7 +701,7 @@ html[data-theme="dark"] .logo-dark,
 .auth-card > .section-kicker {
   display: block;
   text-align: center;
-  font-size: 10px;
+  font-size: 13px;
   letter-spacing: 0.7px;
   line-height: 1.6;
   color: #aa95c0;
@@ -718,6 +722,6 @@ html[data-theme="dark"] .logo-dark,
   gap: 13px;
   flex-wrap: wrap;
   margin-top: 24px;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--purple);
 }
